@@ -4,9 +4,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, LogOut, Users, Table, User } from "lucide-react";
+import { Calendar, LogOut, Users, User } from "lucide-react";
 import { toast } from "sonner";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { AppointmentsList } from "@/components/AppointmentsList";
+import { AppointmentBooking } from "@/components/AppointmentBooking";
+import { AdminPanel } from "@/components/AdminPanel";
 
 interface Profile {
   id: string;
@@ -27,6 +30,7 @@ const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -139,20 +143,31 @@ const Dashboard = () => {
             )}
           </TabsList>
 
-          <TabsContent value="appointments">
+          <TabsContent value="appointments" className="space-y-6">
             <Card className="shadow-medium">
               <CardHeader>
-                <CardTitle>Mes rendez-vous</CardTitle>
-                <CardDescription>
-                  Gérez vos rendez-vous pour le SIVAL 2025
-                </CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Mes rendez-vous</CardTitle>
+                    <CardDescription>
+                      Gérez vos rendez-vous pour le SIVAL 2025
+                    </CardDescription>
+                  </div>
+                  {profile && (
+                    <AppointmentBooking
+                      userId={user!.id}
+                      userType={profile.user_type}
+                      onSuccess={() => setRefreshKey((k) => k + 1)}
+                    />
+                  )}
+                </div>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-12 text-muted-foreground">
-                  <Calendar className="h-16 w-16 mx-auto mb-4 opacity-50" />
-                  <p className="text-lg mb-4">Aucun rendez-vous pour le moment</p>
-                  <Button>Prendre un rendez-vous</Button>
-                </div>
+                <AppointmentsList
+                  key={refreshKey}
+                  userId={user!.id}
+                  onUpdate={() => setRefreshKey((k) => k + 1)}
+                />
               </CardContent>
             </Card>
           </TabsContent>
@@ -196,46 +211,7 @@ const Dashboard = () => {
 
           {isAdmin && (
             <TabsContent value="admin">
-              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                <Card className="shadow-medium">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5" />
-                      Participants
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold">0</p>
-                    <p className="text-sm text-muted-foreground">participants inscrits</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-medium">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5" />
-                      Rendez-vous
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold">0</p>
-                    <p className="text-sm text-muted-foreground">rendez-vous programmés</p>
-                  </CardContent>
-                </Card>
-
-                <Card className="shadow-medium">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Table className="h-5 w-5" />
-                      Tables
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-3xl font-bold">40</p>
-                    <p className="text-sm text-muted-foreground">tables disponibles</p>
-                  </CardContent>
-                </Card>
-              </div>
+              <AdminPanel />
             </TabsContent>
           )}
         </Tabs>
