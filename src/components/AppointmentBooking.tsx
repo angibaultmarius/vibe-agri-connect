@@ -5,8 +5,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Search, User } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { Calendar as CalendarIcon, Clock, Search, User } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -17,12 +17,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface Profile {
   id: string;
   full_name: string;
   company: string;
   user_type: "buyer" | "supplier";
+  avatar_url: string | null;
 }
 
 interface TimeSlot {
@@ -45,12 +47,19 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
   const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingProfiles, setLoadingProfiles] = useState(false);
 
   const targetType = userType === "buyer" ? "supplier" : "buyer";
+
+  // Available dates for the calendar
+  const availableDates = [
+    new Date(2025, 0, 14), // 14 janvier 2025
+    new Date(2025, 0, 15), // 15 janvier 2025
+  ];
 
   useEffect(() => {
     if (open) {
@@ -63,7 +72,7 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
     setLoadingProfiles(true);
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, full_name, company, user_type")
+      .select("id, full_name, company, user_type, avatar_url")
       .eq("user_type", targetType)
       .neq("id", userId);
 
@@ -132,6 +141,7 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
       toast.success("Rendez-vous créé avec succès !");
       setOpen(false);
       setSelectedProfile(null);
+      setSelectedDate(undefined);
       setSelectedSlot(null);
       setNotes("");
       onSuccess?.();
@@ -146,36 +156,37 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
       p.company.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const groupedSlots = timeSlots.reduce((acc, slot) => {
-    const date = slot.slot_date;
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(slot);
-    return acc;
-  }, {} as Record<string, TimeSlot[]>);
+  const selectedDateSlots = selectedDate
+    ? timeSlots.filter(
+        (slot) => slot.slot_date === format(selectedDate, "yyyy-MM-dd")
+      )
+    : [];
 
   return (
     <>
       <Button onClick={() => setOpen(true)} size="lg">
-        <Calendar className="mr-2 h-5 w-5" />
+        <CalendarIcon className="mr-2 h-5 w-5" />
         Prendre un rendez-vous
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Nouveau rendez-vous</DialogTitle>
             <DialogDescription>
-              Sélectionnez un {targetType === "buyer" ? "acheteur" : "fournisseur"} et un créneau
-              disponible
+              Sélectionnez un {targetType === "buyer" ? "acheteur" : "fournisseur"}, une date et
+              un créneau
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-6">
-            {/* Participant Selection */}
-            <div className="space-y-3">
-              <Label>
-                Sélectionner un {targetType === "buyer" ? "acheteur" : "fournisseur"}
-              </Label>
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Left Column - Participant Selection */}
+            <div className="space-y-4">
+              <div>
+                <Label className="text-base font-semibold">
+                  1. Sélectionner un {targetType === "buyer" ? "acheteur" : "fournisseur"}
+                </Label>
+              </div>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -191,7 +202,7 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <div className="grid gap-2 max-h-60 overflow-y-auto">
+                <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
                   {filteredProfiles.map((profile) => (
                     <Card
                       key={profile.id}
@@ -202,14 +213,19 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
                       }`}
                       onClick={() => setSelectedProfile(profile)}
                     >
-                      <CardContent className="p-4">
+                      <CardContent className="p-3">
                         <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-full bg-primary/10">
-                            <User className="h-4 w-4 text-primary" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{profile.full_name}</p>
-                            <p className="text-sm text-muted-foreground">{profile.company}</p>
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage src={profile.avatar_url || undefined} />
+                            <AvatarFallback>
+                              {profile.full_name.split(" ").map((n) => n[0]).join("")}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">{profile.full_name}</p>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {profile.company}
+                            </p>
                           </div>
                         </div>
                       </CardContent>
@@ -219,19 +235,33 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
               )}
             </div>
 
-            {/* Time Slot Selection */}
-            {selectedProfile && (
-              <div className="space-y-3">
-                <Label>Sélectionner un créneau</Label>
-                <div className="space-y-4">
-                  {Object.entries(groupedSlots).map(([date, slots]) => (
-                    <div key={date} className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm font-medium">
-                        <Calendar className="h-4 w-4 text-primary" />
-                        {format(new Date(date), "EEEE d MMMM yyyy", { locale: fr })}
-                      </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        {slots.map((slot) => (
+            {/* Right Column - Date and Time Selection */}
+            <div className="space-y-4">
+              {selectedProfile && (
+                <>
+                  <div>
+                    <Label className="text-base font-semibold">2. Sélectionner une date</Label>
+                  </div>
+                  <div className="flex justify-center">
+                    <Calendar
+                      mode="single"
+                      selected={selectedDate}
+                      onSelect={setSelectedDate}
+                      disabled={(date) =>
+                        !availableDates.some(
+                          (d) => d.toDateString() === date.toDateString()
+                        )
+                      }
+                      initialFocus
+                      className="rounded-md border"
+                    />
+                  </div>
+
+                  {selectedDate && (
+                    <div className="space-y-3">
+                      <Label className="text-base font-semibold">3. Sélectionner un créneau</Label>
+                      <div className="grid grid-cols-2 gap-2">
+                        {selectedDateSlots.map((slot) => (
                           <Button
                             key={slot.id}
                             variant={selectedSlot?.id === slot.id ? "default" : "outline"}
@@ -245,37 +275,37 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
                         ))}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Notes */}
-            {selectedSlot && (
-              <div className="space-y-2">
-                <Label htmlFor="notes">Notes (optionnel)</Label>
-                <Textarea
-                  id="notes"
-                  placeholder="Ajoutez des notes pour ce rendez-vous..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                />
-              </div>
-            )}
-
-            {/* Submit */}
-            {selectedProfile && selectedSlot && (
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <Button variant="outline" onClick={() => setOpen(false)}>
-                  Annuler
-                </Button>
-                <Button onClick={handleSubmit} disabled={loading}>
-                  {loading ? "Création..." : "Confirmer le rendez-vous"}
-                </Button>
-              </div>
-            )}
+                  )}
+                </>
+              )}
+            </div>
           </div>
+
+          {/* Notes */}
+          {selectedSlot && (
+            <div className="space-y-2 pt-4 border-t">
+              <Label htmlFor="notes">Notes (optionnel)</Label>
+              <Textarea
+                id="notes"
+                placeholder="Ajoutez des notes pour ce rendez-vous..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={3}
+              />
+            </div>
+          )}
+
+          {/* Submit */}
+          {selectedProfile && selectedSlot && (
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button variant="outline" onClick={() => setOpen(false)}>
+                Annuler
+              </Button>
+              <Button onClick={handleSubmit} disabled={loading}>
+                {loading ? "Création..." : "Confirmer le rendez-vous"}
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>
