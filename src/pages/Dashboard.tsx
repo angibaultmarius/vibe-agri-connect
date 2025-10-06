@@ -4,12 +4,14 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Calendar, LogOut, Users, User } from "lucide-react";
+import { Calendar, LogOut, Users, User, UserCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { AppointmentsList } from "@/components/AppointmentsList";
 import { AppointmentBooking } from "@/components/AppointmentBooking";
 import { AdminPanel } from "@/components/AdminPanel";
+import { ProfileEdit } from "@/components/ProfileEdit";
+import { ParticipantsList } from "@/components/ParticipantsList";
 
 interface Profile {
   id: string;
@@ -18,6 +20,7 @@ interface Profile {
   company: string;
   user_type: "buyer" | "supplier";
   phone: string | null;
+  avatar_url: string | null;
 }
 
 interface UserRole {
@@ -131,6 +134,10 @@ const Dashboard = () => {
               <Calendar className="h-4 w-4 mr-2" />
               Mes rendez-vous
             </TabsTrigger>
+            <TabsTrigger value="participants">
+              <UserCircle className="h-4 w-4 mr-2" />
+              Participants
+            </TabsTrigger>
             <TabsTrigger value="profile">
               <User className="h-4 w-4 mr-2" />
               Mon profil
@@ -172,38 +179,44 @@ const Dashboard = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="participants">
+            <Card className="shadow-medium">
+              <CardHeader>
+                <CardTitle>Participants SIVAL 2025</CardTitle>
+                <CardDescription>
+                  Liste de tous les participants inscrits
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ParticipantsList />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="profile">
             <Card className="shadow-medium">
               <CardHeader>
                 <CardTitle>Mon profil</CardTitle>
                 <CardDescription>
-                  Informations de votre compte
+                  Modifiez vos informations personnelles
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Nom</label>
-                  <p className="text-lg">{profile?.full_name}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Entreprise</label>
-                  <p className="text-lg">{profile?.company}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Email</label>
-                  <p className="text-lg">{profile?.email}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-muted-foreground">Type</label>
-                  <p className="text-lg">
-                    {profile?.user_type === "buyer" ? "Acheteur international" : "Fournisseur de solutions"}
-                  </p>
-                </div>
-                {profile?.phone && (
-                  <div>
-                    <label className="text-sm font-medium text-muted-foreground">Téléphone</label>
-                    <p className="text-lg">{profile.phone}</p>
-                  </div>
+              <CardContent>
+                {profile && (
+                  <ProfileEdit
+                    profile={profile}
+                    onUpdate={() => {
+                      // Refresh profile data
+                      supabase
+                        .from("profiles")
+                        .select("*")
+                        .eq("id", user!.id)
+                        .single()
+                        .then(({ data }) => {
+                          if (data) setProfile(data);
+                        });
+                    }}
+                  />
                 )}
               </CardContent>
             </Card>
