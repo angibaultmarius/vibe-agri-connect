@@ -15,6 +15,8 @@ interface Profile {
   user_type: "buyer" | "supplier";
   phone: string | null;
   avatar_url: string | null;
+  country: string | null;
+  sectors: string[] | null;
 }
 
 interface ProfileEditProps {
@@ -22,13 +24,33 @@ interface ProfileEditProps {
   onUpdate: () => void;
 }
 
+const SECTORS = [
+  "Arboriculture",
+  "Vegetable Crops",
+  "Wine Growing",
+  "Mushroom Growing",
+  "Seeds and seedlings",
+  "Horticulture",
+  "Cider Making",
+  "New sectors",
+  "Scented aromatic and medicinal plants",
+];
+
 export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
   const [fullName, setFullName] = useState(profile.full_name);
   const [company, setCompany] = useState(profile.company);
   const [phone, setPhone] = useState(profile.phone || "");
+  const [country, setCountry] = useState(profile.country || "");
+  const [sectors, setSectors] = useState<string[]>(profile.sectors || []);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  const toggleSector = (sector: string) => {
+    setSectors((prev) =>
+      prev.includes(sector) ? prev.filter((s) => s !== sector) : [...prev, sector]
+    );
+  };
 
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
@@ -72,6 +94,8 @@ export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
         full_name: fullName,
         company: company,
         phone: phone || null,
+        country: country || null,
+        sectors: sectors.length > 0 ? sectors : null,
         avatar_url: avatarUrl,
       })
       .eq("id", profile.id);
@@ -149,6 +173,36 @@ export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
             onChange={(e) => setPhone(e.target.value)}
             placeholder="+33 6 12 34 56 78"
           />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="country">Pays</Label>
+          <Input
+            id="country"
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            placeholder="France"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Filière(s)</Label>
+          <div className="grid grid-cols-2 gap-2">
+            {SECTORS.map((sector) => (
+              <button
+                key={sector}
+                type="button"
+                onClick={() => toggleSector(sector)}
+                className={`px-3 py-2 text-sm rounded-md border transition-colors text-left ${
+                  sectors.includes(sector)
+                    ? "bg-primary text-primary-foreground border-primary"
+                    : "bg-background hover:bg-muted border-input"
+                }`}
+              >
+                {sector}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-2">
