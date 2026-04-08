@@ -5,9 +5,26 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Building2, Mail, Phone, User, Calendar, Globe } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Search,
+  Building2,
+  Globe,
+  Calendar,
+  Clock,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { toast } from "sonner";
-import { AppointmentBooking } from "./AppointmentBooking";
 import {
   Dialog,
   DialogContent,
@@ -15,10 +32,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Calendar as CalendarComponent } from "@/components/ui/calendar";
-import { Textarea } from "@/components/ui/textarea";
-import { Clock } from "lucide-react";
 import { format } from "date-fns";
 
 interface Profile {
@@ -53,10 +66,20 @@ const SECTORS = [
   "Scented aromatic and medicinal plants",
 ];
 
+const PAGE_SIZE = 10;
+
+const availableDates = [
+  new Date(2025, 0, 14),
+  new Date(2025, 0, 15),
+];
+
 export const ParticipantsList = () => {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
+  const [selectedCountry, setSelectedCountry] = useState<string>("all");
+  const [selectedType, setSelectedType] = useState<"all" | "buyer" | "supplier">("all");
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState<Profile | null>(null);
@@ -68,16 +91,16 @@ export const ParticipantsList = () => {
   const [notes, setNotes] = useState("");
   const [bookingLoading, setBookingLoading] = useState(false);
 
-  const availableDates = [
-    new Date(2025, 0, 14), // 14 janvier 2025
-    new Date(2025, 0, 15), // 15 janvier 2025
-  ];
-
   useEffect(() => {
     fetchCurrentUser();
     fetchProfiles();
     fetchTimeSlots();
   }, []);
+
+  // Reset to page 1 on filter change
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, selectedSectors, selectedCountry, selectedType]);
 
   const fetchCurrentUser = async () => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -88,9 +111,7 @@ export const ParticipantsList = () => {
         .select("user_type")
         .eq("id", user.id)
         .single();
-      if (profile) {
-        setCurrentUserType(profile.user_type);
-      }
+      if (profile) setCurrentUserType(profile.user_type);
     }
   };
 
@@ -111,18 +132,13 @@ export const ParticipantsList = () => {
   };
 
   const fetchTimeSlots = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from("time_slots")
       .select("*")
       .eq("is_available", true)
       .order("slot_date", { ascending: true })
       .order("start_time", { ascending: true });
-
-    if (error) {
-      toast.error("Erreur lors du chargement des créneaux");
-    } else {
-      setTimeSlots(data || []);
-    }
+    setTimeSlots(data || []);
   };
 
   const toggleSector = (sector: string) => {
@@ -147,13 +163,28 @@ export const ParticipantsList = () => {
 
     setBookingLoading(true);
 
+    const buyerId = currentUserType === "buyer" ? currentUserId : selectedProfile.id;
+    const supplierId = currentUserType === "supplier" ? currentUserId : selectedProfile.id;
+
+    // Conflict detection
+    const { data: conflicts } = await supabase
+      .from("appointments")
+      .select("id")
+      .eq("time_slot_id", selectedSlot.id)
+      .or(`buyer_id.eq.${buyerId},supplier_id.eq.${supplierId}`);
+
+    if (conflicts && conflicts.length > 0) {
+      toast.error("Ce créneau est déjà réservé pour vous ou votre interlocuteur");
+      setBookingLoading(false);
+      return;
+    }
+
     // Find available table
     const { data: tables } = await supabase
       .from("meeting_tables")
       .select("id")
       .order("table_number", { ascending: true });
 
-    // Get appointments for this time slot
     const { data: existingAppointments } = await supabase
       .from("appointments")
       .select("table_id")
@@ -162,17 +193,15 @@ export const ParticipantsList = () => {
     const usedTableIds = existingAppointments?.map((a) => a.table_id).filter(Boolean) || [];
     const availableTable = tables?.find((t) => !usedTableIds.includes(t.id));
 
-    const appointmentData = {
-      buyer_id: currentUserType === "buyer" ? currentUserId : selectedProfile.id,
-      supplier_id: currentUserType === "supplier" ? currentUserId : selectedProfile.id,
+    const { error } = await supabase.from("appointments").insert({
+      buyer_id: buyerId,
+      supplier_id: supplierId,
       time_slot_id: selectedSlot.id,
       table_id: availableTable?.id || null,
       notes: notes || null,
       status: "confirmed",
       created_by: currentUserId,
-    };
-
-    const { error } = await supabase.from("appointments").insert(appointmentData);
+    });
 
     if (error) {
       toast.error("Erreur lors de la création du rendez-vous");
@@ -180,14 +209,15 @@ export const ParticipantsList = () => {
     } else {
       toast.success("Rendez-vous créé avec succès !");
       setBookingDialogOpen(false);
-      setSelectedProfile(null);
-      setSelectedDate(undefined);
-      setSelectedSlot(null);
-      setNotes("");
     }
 
     setBookingLoading(false);
   };
+
+  // Derive unique countries for filter
+  const countries = Array.from(
+    new Set(profiles.map((p) => p.country).filter(Boolean) as string[])
+  ).sort();
 
   const filteredProfiles = profiles.filter((p) => {
     const matchesSearch =
@@ -199,17 +229,32 @@ export const ParticipantsList = () => {
       selectedSectors.length === 0 ||
       (p.sectors && p.sectors.some((s) => selectedSectors.includes(s)));
 
-    return matchesSearch && matchesSectors;
+    const matchesCountry = selectedCountry === "all" || p.country === selectedCountry;
+
+    const matchesType = selectedType === "all" || p.user_type === selectedType;
+
+    return matchesSearch && matchesSectors && matchesCountry && matchesType;
   });
 
-  const buyers = filteredProfiles.filter((p) => p.user_type === "buyer");
-  const suppliers = filteredProfiles.filter((p) => p.user_type === "supplier");
+  const totalPages = Math.ceil(filteredProfiles.length / PAGE_SIZE);
+  const paginatedProfiles = filteredProfiles.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const buyers = paginatedProfiles.filter((p) => p.user_type === "buyer");
+  const suppliers = paginatedProfiles.filter((p) => p.user_type === "supplier");
 
   const selectedDateSlots = selectedDate
-    ? timeSlots.filter(
-        (slot) => slot.slot_date === format(selectedDate, "yyyy-MM-dd")
-      )
+    ? timeSlots.filter((slot) => slot.slot_date === format(selectedDate, "yyyy-MM-dd"))
     : [];
+
+  const resetFilters = () => {
+    setSearchQuery("");
+    setSelectedSectors([]);
+    setSelectedCountry("all");
+    setSelectedType("all");
+  };
+
+  const hasActiveFilters =
+    searchQuery || selectedSectors.length > 0 || selectedCountry !== "all" || selectedType !== "all";
 
   if (loading) {
     return (
@@ -240,7 +285,10 @@ export const ParticipantsList = () => {
               <div>
                 <div className="flex items-center gap-2">
                   <h4 className="font-medium">{profile.full_name}</h4>
-                  <Badge variant="default" className={profile.user_type === "buyer" ? "bg-blue-500" : "bg-green-600"}>
+                  <Badge
+                    variant="default"
+                    className={profile.user_type === "buyer" ? "bg-blue-500" : "bg-green-600"}
+                  >
                     {profile.user_type === "buyer" ? "Acheteur" : "Fournisseur"}
                   </Badge>
                 </div>
@@ -284,6 +332,7 @@ export const ParticipantsList = () => {
   return (
     <>
       <div className="space-y-6">
+        {/* Search */}
         <div className="relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
@@ -292,6 +341,46 @@ export const ParticipantsList = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+        </div>
+
+        {/* Filters row */}
+        <div className="flex flex-wrap gap-4 items-end">
+          <div className="space-y-1">
+            <Label className="text-sm font-medium">Type</Label>
+            <Select value={selectedType} onValueChange={(v) => setSelectedType(v as typeof selectedType)}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les types</SelectItem>
+                <SelectItem value="buyer">Acheteurs</SelectItem>
+                <SelectItem value="supplier">Fournisseurs</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {countries.length > 0 && (
+            <div className="space-y-1">
+              <Label className="text-sm font-medium">Pays</Label>
+              <Select value={selectedCountry} onValueChange={setSelectedCountry}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les pays</SelectItem>
+                  {countries.map((c) => (
+                    <SelectItem key={c} value={c}>{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={resetFilters} className="self-end">
+              Réinitialiser les filtres
+            </Button>
+          )}
         </div>
 
         {/* Sector filters */}
@@ -309,40 +398,57 @@ export const ParticipantsList = () => {
               </Badge>
             ))}
           </div>
-          {selectedSectors.length > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSelectedSectors([])}
-            >
-              Réinitialiser les filtres
-            </Button>
-          )}
         </div>
 
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Acheteurs */}
+        {/* Results summary */}
+        <p className="text-sm text-muted-foreground">
+          {filteredProfiles.length} participant{filteredProfiles.length !== 1 ? "s" : ""} trouvé{filteredProfiles.length !== 1 ? "s" : ""}
+        </p>
+
+        {selectedType !== "supplier" && buyers.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold">Acheteurs internationaux</h3>
               <Badge variant="secondary">{buyers.length}</Badge>
             </div>
-            <div className="space-y-3">
-              {buyers.map(renderProfileCard)}
-            </div>
+            <div className="space-y-3">{buyers.map(renderProfileCard)}</div>
           </div>
+        )}
 
-          {/* Fournisseurs */}
+        {selectedType !== "buyer" && suppliers.length > 0 && (
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-semibold">Fournisseurs de solutions</h3>
               <Badge variant="secondary">{suppliers.length}</Badge>
             </div>
-            <div className="space-y-3">
-              {suppliers.map(renderProfileCard)}
-            </div>
+            <div className="space-y-3">{suppliers.map(renderProfileCard)}</div>
           </div>
-        </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 pt-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page} / {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Booking Dialog */}
@@ -357,7 +463,6 @@ export const ParticipantsList = () => {
 
           {selectedProfile && (
             <div className="space-y-6">
-              {/* Profile Info */}
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-4">
@@ -375,7 +480,6 @@ export const ParticipantsList = () => {
                 </CardContent>
               </Card>
 
-              {/* Date Selection */}
               <div className="space-y-3">
                 <Label className="text-base font-semibold">1. Sélectionner une date</Label>
                 <div className="flex justify-center">
@@ -384,9 +488,7 @@ export const ParticipantsList = () => {
                     selected={selectedDate}
                     onSelect={setSelectedDate}
                     disabled={(date) =>
-                      !availableDates.some(
-                        (d) => d.toDateString() === date.toDateString()
-                      )
+                      !availableDates.some((d) => d.toDateString() === date.toDateString())
                     }
                     initialFocus
                     className="rounded-md border"
@@ -394,7 +496,6 @@ export const ParticipantsList = () => {
                 </div>
               </div>
 
-              {/* Time Slot Selection */}
               {selectedDate && (
                 <div className="space-y-3">
                   <Label className="text-base font-semibold">2. Sélectionner un créneau</Label>
@@ -415,7 +516,6 @@ export const ParticipantsList = () => {
                 </div>
               )}
 
-              {/* Notes */}
               {selectedSlot && (
                 <div className="space-y-2">
                   <Label htmlFor="notes">Notes (optionnel)</Label>
@@ -429,7 +529,6 @@ export const ParticipantsList = () => {
                 </div>
               )}
 
-              {/* Submit */}
               {selectedSlot && (
                 <div className="flex justify-end gap-3 pt-4 border-t">
                   <Button variant="outline" onClick={() => setBookingDialogOpen(false)}>

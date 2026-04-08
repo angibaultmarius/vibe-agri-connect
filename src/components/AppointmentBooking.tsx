@@ -107,6 +107,22 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
 
     setLoading(true);
 
+    // Conflict detection: check if current user or target already has an appointment at this slot
+    const buyerId = userType === "buyer" ? userId : selectedProfile.id;
+    const supplierId = userType === "supplier" ? userId : selectedProfile.id;
+
+    const { data: conflicts } = await supabase
+      .from("appointments")
+      .select("id")
+      .eq("time_slot_id", selectedSlot.id)
+      .or(`buyer_id.eq.${buyerId},supplier_id.eq.${supplierId}`);
+
+    if (conflicts && conflicts.length > 0) {
+      toast.error("Ce créneau est déjà réservé pour vous ou votre interlocuteur");
+      setLoading(false);
+      return;
+    }
+
     // Find available table
     const { data: tables } = await supabase
       .from("meeting_tables")
@@ -123,8 +139,8 @@ export const AppointmentBooking = ({ userId, userType, onSuccess }: AppointmentB
     const availableTable = tables?.find((t) => !usedTableIds.includes(t.id));
 
     const appointmentData = {
-      buyer_id: userType === "buyer" ? userId : selectedProfile.id,
-      supplier_id: userType === "supplier" ? userId : selectedProfile.id,
+      buyer_id: buyerId,
+      supplier_id: supplierId,
       time_slot_id: selectedSlot.id,
       table_id: availableTable?.id || null,
       notes: notes || null,

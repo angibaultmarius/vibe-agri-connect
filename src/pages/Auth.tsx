@@ -1,6 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,68 +13,71 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Loader2, Sprout } from "lucide-react";
 
+const signInSchema = z.object({
+  email: z.string().email("Email invalide"),
+  password: z.string().min(6, "Le mot de passe doit faire au moins 6 caractères"),
+});
+
+const signUpSchema = z.object({
+  fullName: z.string().min(2, "Le nom doit faire au moins 2 caractères"),
+  company: z.string().min(2, "L'entreprise doit faire au moins 2 caractères"),
+  userType: z.enum(["buyer", "supplier"]),
+  phone: z.string().optional(),
+  email: z.string().email("Email invalide"),
+  password: z.string().min(6, "Le mot de passe doit faire au moins 6 caractères"),
+});
+
+type SignInData = z.infer<typeof signInSchema>;
+type SignUpData = z.infer<typeof signUpSchema>;
+
 const Auth = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignUp = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const signInForm = useForm<SignInData>({ resolver: zodResolver(signInSchema) });
+  const signUpForm = useForm<SignUpData>({
+    resolver: zodResolver(signUpSchema),
+    defaultValues: { userType: "buyer" },
+  });
+
+  const handleSignIn = async (data: SignInData) => {
     setIsLoading(true);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-    const fullName = formData.get("fullName") as string;
-    const company = formData.get("company") as string;
-    const userType = formData.get("userType") as string;
-    const phone = formData.get("phone") as string;
-
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            full_name: fullName,
-            company,
-            user_type: userType,
-            phone,
-          },
-        },
+      const { error } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
       });
-
       if (error) throw error;
-
-      toast.success("Compte créé avec succès ! Connexion en cours...");
-      setTimeout(() => navigate("/dashboard"), 1000);
+      toast.success("Connexion réussie !");
+      navigate("/dashboard");
     } catch (error: any) {
-      toast.error(error.message || "Erreur lors de la création du compte");
+      toast.error(error.message || "Erreur lors de la connexion");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleSignIn = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
+  const handleSignUp = async (data: SignUpData) => {
     setIsLoading(true);
-
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
     try {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
+      const { error } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: data.fullName,
+            company: data.company,
+            user_type: data.userType,
+            phone: data.phone || null,
+          },
+        },
       });
-
       if (error) throw error;
-
-      toast.success("Connexion réussie !");
-      navigate("/dashboard");
+      toast.success("Compte créé avec succès ! Connexion en cours...");
+      setTimeout(() => navigate("/dashboard"), 1000);
     } catch (error: any) {
-      toast.error(error.message || "Erreur lors de la connexion");
+      toast.error(error.message || "Erreur lors de la création du compte");
     } finally {
       setIsLoading(false);
     }
@@ -101,25 +107,29 @@ const Auth = () => {
             </TabsList>
 
             <TabsContent value="signin">
-              <form onSubmit={handleSignIn} className="space-y-4">
+              <form onSubmit={signInForm.handleSubmit(handleSignIn)} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signin-email">Email</Label>
                   <Input
                     id="signin-email"
-                    name="email"
                     type="email"
                     placeholder="votre@email.com"
-                    required
+                    {...signInForm.register("email")}
                   />
+                  {signInForm.formState.errors.email && (
+                    <p className="text-xs text-destructive">{signInForm.formState.errors.email.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signin-password">Mot de passe</Label>
                   <Input
                     id="signin-password"
-                    name="password"
                     type="password"
-                    required
+                    {...signInForm.register("password")}
                   />
+                  {signInForm.formState.errors.password && (
+                    <p className="text-xs text-destructive">{signInForm.formState.errors.password.message}</p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
@@ -135,30 +145,37 @@ const Auth = () => {
             </TabsContent>
 
             <TabsContent value="signup">
-              <form onSubmit={handleSignUp} className="space-y-4">
+              <form onSubmit={signUpForm.handleSubmit(handleSignUp)} className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="signup-name">Nom complet</Label>
                   <Input
                     id="signup-name"
-                    name="fullName"
                     type="text"
                     placeholder="Jean Dupont"
-                    required
+                    {...signUpForm.register("fullName")}
                   />
+                  {signUpForm.formState.errors.fullName && (
+                    <p className="text-xs text-destructive">{signUpForm.formState.errors.fullName.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-company">Entreprise</Label>
                   <Input
                     id="signup-company"
-                    name="company"
                     type="text"
                     placeholder="Nom de votre entreprise"
-                    required
+                    {...signUpForm.register("company")}
                   />
+                  {signUpForm.formState.errors.company && (
+                    <p className="text-xs text-destructive">{signUpForm.formState.errors.company.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-type">Type de profil</Label>
-                  <Select name="userType" defaultValue="buyer" required>
+                  <Select
+                    defaultValue="buyer"
+                    onValueChange={(v) => signUpForm.setValue("userType", v as "buyer" | "supplier")}
+                  >
                     <SelectTrigger id="signup-type">
                       <SelectValue />
                     </SelectTrigger>
@@ -172,30 +189,33 @@ const Auth = () => {
                   <Label htmlFor="signup-phone">Téléphone (optionnel)</Label>
                   <Input
                     id="signup-phone"
-                    name="phone"
                     type="tel"
                     placeholder="+33 6 12 34 56 78"
+                    {...signUpForm.register("phone")}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-email">Email</Label>
                   <Input
                     id="signup-email"
-                    name="email"
                     type="email"
                     placeholder="votre@email.com"
-                    required
+                    {...signUpForm.register("email")}
                   />
+                  {signUpForm.formState.errors.email && (
+                    <p className="text-xs text-destructive">{signUpForm.formState.errors.email.message}</p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="signup-password">Mot de passe</Label>
                   <Input
                     id="signup-password"
-                    name="password"
                     type="password"
-                    required
-                    minLength={6}
+                    {...signUpForm.register("password")}
                   />
+                  {signUpForm.formState.errors.password && (
+                    <p className="text-xs text-destructive">{signUpForm.formState.errors.password.message}</p>
+                  )}
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? (
