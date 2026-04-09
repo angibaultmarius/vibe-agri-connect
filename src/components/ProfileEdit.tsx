@@ -1,4 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,6 +27,15 @@ interface ProfileEditProps {
   onUpdate: () => void;
 }
 
+const profileSchema = z.object({
+  full_name: z.string().min(2, "Le nom doit faire au moins 2 caractères"),
+  company: z.string().min(2, "L'entreprise doit faire au moins 2 caractères"),
+  phone: z.string().optional(),
+  country: z.string().optional(),
+});
+
+type ProfileFormData = z.infer<typeof profileSchema>;
+
 const SECTORS = [
   "Arboriculture",
   "Vegetable Crops",
@@ -37,14 +49,23 @@ const SECTORS = [
 ];
 
 export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
-  const [fullName, setFullName] = useState(profile.full_name);
-  const [company, setCompany] = useState(profile.company);
-  const [phone, setPhone] = useState(profile.phone || "");
-  const [country, setCountry] = useState(profile.country || "");
   const [sectors, setSectors] = useState<string[]>(profile.sectors || []);
   const [avatarUrl, setAvatarUrl] = useState(profile.avatar_url);
   const [uploading, setUploading] = useState(false);
-  const [saving, setSaving] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<ProfileFormData>({
+    resolver: zodResolver(profileSchema),
+    defaultValues: {
+      full_name: profile.full_name,
+      company: profile.company,
+      phone: profile.phone || "",
+      country: profile.country || "",
+    },
+  });
 
   const toggleSector = (sector: string) => {
     setSectors((prev) =>
@@ -55,25 +76,16 @@ export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
   const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
-
-      if (!event.target.files || event.target.files.length === 0) {
-        return;
-      }
+      if (!event.target.files || event.target.files.length === 0) return;
 
       const file = event.target.files[0];
       const fileExt = file.name.split(".").pop();
       const filePath = `${profile.id}/${Math.random()}.${fileExt}`;
 
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(filePath, file);
-
-      if (uploadError) {
-        throw uploadError;
-      }
+      const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file);
+      if (uploadError) throw uploadError;
 
       const { data } = supabase.storage.from("avatars").getPublicUrl(filePath);
-
       setAvatarUrl(data.publicUrl);
       toast.success("Photo uploadée avec succès");
     } catch (error) {
@@ -84,17 +96,14 @@ export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-
+  const onSubmit = async (data: ProfileFormData) => {
     const { error } = await supabase
       .from("profiles")
       .update({
-        full_name: fullName,
-        company: company,
-        phone: phone || null,
-        country: country || null,
+        full_name: data.full_name,
+        company: data.company,
+        phone: data.phone || null,
+        country: data.country || null,
         sectors: sectors.length > 0 ? sectors : null,
         avatar_url: avatarUrl,
       })
@@ -107,18 +116,16 @@ export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
       toast.success("Profil mis à jour avec succès");
       onUpdate();
     }
-
-    setSaving(false);
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
       <div className="flex justify-center">
         <div className="relative">
           <Avatar className="h-32 w-32">
-            <AvatarImage src={avatarUrl || undefined} alt={fullName} />
+            <AvatarImage src={avatarUrl || undefined} alt={profile.full_name} />
             <AvatarFallback className="text-2xl">
-              {fullName.split(" ").map((n) => n[0]).join("")}
+              {profile.full_name.split(" ").map((n) => n[0]).join("")}
             </AvatarFallback>
           </Avatar>
           <label
@@ -141,22 +148,18 @@ export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
       <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="full_name">Nom complet</Label>
-          <Input
-            id="full_name"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
-            required
-          />
+          <Input id="full_name" {...register("full_name")} />
+          {errors.full_name && (
+            <p className="text-xs text-destructive">{errors.full_name.message}</p>
+          )}
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="company">Entreprise</Label>
-          <Input
-            id="company"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-            required
-          />
+          <Input id="company" {...register("company")} />
+          {errors.company && (
+            <p className="text-xs text-destructive">{errors.company.message}</p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -166,23 +169,12 @@ export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
 
         <div className="space-y-2">
           <Label htmlFor="phone">Téléphone</Label>
-          <Input
-            id="phone"
-            type="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            placeholder="+33 6 12 34 56 78"
-          />
+          <Input id="phone" type="tel" placeholder="+33 6 12 34 56 78" {...register("phone")} />
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="country">Pays</Label>
-          <Input
-            id="country"
-            value={country}
-            onChange={(e) => setCountry(e.target.value)}
-            placeholder="France"
-          />
+          <Input id="country" placeholder="France" {...register("country")} />
         </div>
 
         <div className="space-y-2">
@@ -213,9 +205,9 @@ export const ProfileEdit = ({ profile, onUpdate }: ProfileEditProps) => {
         </div>
       </div>
 
-      <Button type="submit" disabled={saving} className="w-full">
+      <Button type="submit" disabled={isSubmitting} className="w-full">
         <Save className="h-4 w-4 mr-2" />
-        {saving ? "Enregistrement..." : "Enregistrer les modifications"}
+        {isSubmitting ? "Enregistrement..." : "Enregistrer les modifications"}
       </Button>
     </form>
   );

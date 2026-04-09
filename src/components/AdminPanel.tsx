@@ -3,9 +3,28 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Users, Table, Clock, TrendingUp, Download } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar, Users, Table, Clock, TrendingUp, Download, Search, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { toast } from "sonner";
 
 interface Stats {
   totalParticipants: number;
@@ -38,6 +57,9 @@ export const AdminPanel = () => {
   });
   const [appointments, setAppointments] = useState<AppointmentDetail[]>([]);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [dateFilter, setDateFilter] = useState<"all" | "2025-01-14" | "2025-01-15">("all");
+  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchStats();
@@ -47,7 +69,6 @@ export const AdminPanel = () => {
   const fetchStats = async () => {
     setLoading(true);
 
-    // Count profiles
     const { count: totalCount } = await supabase
       .from("profiles")
       .select("*", { count: "exact", head: true });
@@ -62,17 +83,9 @@ export const AdminPanel = () => {
       .select("*", { count: "exact", head: true })
       .eq("user_type", "supplier");
 
-    // Count appointments
     const { data: appointmentsData, count: appointmentsCount } = await supabase
       .from("appointments")
-      .select(
-        `
-        id,
-        table_id,
-        time_slots (slot_date)
-      `,
-        { count: "exact" }
-      );
+      .select("id, table_id, time_slots (slot_date)", { count: "exact" });
 
     const day1 = appointmentsData?.filter(
       (a: any) => a.time_slots?.slot_date === "2025-01-14"
@@ -128,10 +141,35 @@ export const AdminPanel = () => {
     setAppointments((data as any) || []);
   };
 
+  const handleDelete = async (id: string) => {
+    const { error } = await supabase.from("appointments").delete().eq("id", id);
+    if (error) {
+      toast.error("Erreur lors de la suppression");
+    } else {
+      toast.success("Rendez-vous supprimé");
+      fetchAppointments();
+      fetchStats();
+    }
+    setDeleteId(null);
+  };
+
+  const filteredAppointments = appointments.filter((apt) => {
+    const matchesSearch =
+      apt.buyer_profile.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      apt.buyer_profile.company.toLowerCase().includes(search.toLowerCase()) ||
+      apt.supplier_profile.full_name.toLowerCase().includes(search.toLowerCase()) ||
+      apt.supplier_profile.company.toLowerCase().includes(search.toLowerCase());
+
+    const matchesDate =
+      dateFilter === "all" || apt.time_slots.slot_date === dateFilter;
+
+    return matchesSearch && matchesDate;
+  });
+
   const exportData = () => {
     const csv = [
       ["Date", "Heure", "Acheteur", "Entreprise acheteur", "Fournisseur", "Entreprise fournisseur", "Table", "Statut"],
-      ...appointments.map((apt) => [
+      ...filteredAppointments.map((apt) => [
         format(new Date(apt.time_slots.slot_date), "dd/MM/yyyy"),
         `${apt.time_slots.start_time.slice(0, 5)} - ${apt.time_slots.end_time.slice(0, 5)}`,
         apt.buyer_profile.full_name,
@@ -142,15 +180,16 @@ export const AdminPanel = () => {
         apt.status,
       ]),
     ]
-      .map((row) => row.join(","))
+      .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
       .join("\n");
 
-    const blob = new Blob([csv], { type: "text/csv" });
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `vibe-rdv-${format(new Date(), "yyyy-MM-dd")}.csv`;
     a.click();
+    window.URL.revokeObjectURL(url);
   };
 
   if (loading) {
@@ -221,28 +260,54 @@ export const AdminPanel = () => {
         </Card>
       </div>
 
-      {/* Actions */}
-      <div className="flex justify-end">
-        <Button onClick={exportData} variant="outline">
-          <Download className="mr-2 h-4 w-4" />
-          Exporter les données (CSV)
-        </Button>
-      </div>
-
       {/* Appointments List */}
       <Card className="shadow-medium">
         <CardHeader>
-          <CardTitle>Tous les rendez-vous</CardTitle>
-          <CardDescription>Liste complète des rendez-vous programmés</CardDescription>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <CardTitle>Tous les rendez-vous</CardTitle>
+              <CardDescription>
+                {filteredAppointments.length} rendez-vous
+                {filteredAppointments.length !== appointments.length && ` (filtré sur ${appointments.length})`}
+              </CardDescription>
+            </div>
+            <Button onClick={exportData} variant="outline" size="sm">
+              <Download className="mr-2 h-4 w-4" />
+              Exporter CSV
+            </Button>
+          </div>
+
+          {/* Filters */}
+          <div className="flex flex-wrap gap-3 pt-2">
+            <div className="relative flex-1 min-w-48">
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Rechercher un participant..."
+                className="pl-9"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select value={dateFilter} onValueChange={(v) => setDateFilter(v as typeof dateFilter)}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les jours</SelectItem>
+                <SelectItem value="2025-01-14">14 janvier 2025</SelectItem>
+                <SelectItem value="2025-01-15">15 janvier 2025</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
-            {appointments.length === 0 ? (
+            {filteredAppointments.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">
-                Aucun rendez-vous programmé
+                Aucun rendez-vous trouvé
               </p>
             ) : (
-              appointments.map((apt) => (
+              filteredAppointments.map((apt) => (
                 <div
                   key={apt.id}
                   className="flex items-center justify-between p-4 rounded-lg border bg-card hover:shadow-soft transition-shadow"
@@ -272,12 +337,40 @@ export const AdminPanel = () => {
                       </Badge>
                     </div>
                   </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10 ml-2"
+                    onClick={() => setDeleteId(apt.id)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </div>
               ))
             )}
           </div>
         </CardContent>
       </Card>
+
+      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce rendez-vous ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le rendez-vous sera définitivement supprimé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => deleteId && handleDelete(deleteId)}
+            >
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
