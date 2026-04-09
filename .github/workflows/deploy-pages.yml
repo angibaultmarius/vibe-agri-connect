@@ -31,6 +31,7 @@ jobs:
       - name: Build
         run: npm run build
         env:
+          VITE_BASE_PATH: /vibe-agri-connect/
           VITE_SUPABASE_URL: https://oiaerclsipfmidefdcnk.supabase.co
           VITE_SUPABASE_PUBLISHABLE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9pYWVyY2xzaXBmbWlkZWZkY25rIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk0Mzk5NDAsImV4cCI6MjA3NTAxNTk0MH0.mqED6o7DxSq0YGghzJ0WfjipfcM_4xxk-j9uXeuAQ-k
 
