@@ -28,7 +28,7 @@ qu'un score futur n'exige pas de migration.
 
 - **Next.js** (App Router, TypeScript) — déploiement cible **Vercel**
 - **Supabase** — Postgres + Storage (buckets privés)
-- **API Claude** (vision) pour l'estimation des repas, appelée **côté serveur**
+- **API Gemini** (vision) pour l'estimation des repas, appelée **côté serveur**
 - CSS écrit à la main (design system en variables), aucun framework UI
 - PWA : `manifest.json` + service worker minimal, pour l'ajout à l'écran
   d'accueil iOS
@@ -50,10 +50,15 @@ npm run dev
 | `APP_PASSWORD` | Mot de passe unique du verrou d'accès |
 | `APP_SESSION_SECRET` | Secret de signature du cookie (`openssl rand -hex 32`) |
 | `INGEST_TOKEN` | Jeton partagé des routes `/api/ingest/*` |
-| `ANTHROPIC_API_KEY` | Clé du modèle de vision (estimation des repas) |
+| `GEMINI_API_KEY` | Clé du modèle de vision (estimation des repas) |
+| `GEMINI_MODEL` | Facultatif — modèle de vision, défaut `gemini-2.5-flash` |
 
-Sans `ANTHROPIC_API_KEY`, l'app fonctionne : les repas sont enregistrés avec
-leur photo, les colonnes `ia_*` restent vides.
+La clé Gemini se crée en deux clics sur
+[Google AI Studio](https://aistudio.google.com/apikey) — un compte Google
+suffit, sans projet Google Cloud.
+
+Sans `GEMINI_API_KEY`, l'app fonctionne : les repas sont enregistrés avec leur
+photo, les colonnes `ia_*` restent vides.
 
 ## Sécurité
 
@@ -128,10 +133,11 @@ coquille de l'app.
 
 ## Décisions prises en construisant
 
-- **Modèle de vision** : API Claude (`claude-opus-5`), un seul appel avec la
-  photo et une sortie JSON structurée. Effort `low` : l'estimation est courte,
-  inutile de payer une réflexion longue. Si l'appel échoue, le repas est
-  enregistré quand même.
+- **Modèle de vision** : API Gemini (`gemini-2.5-flash` par défaut), un seul
+  appel avec la photo et une sortie JSON structurée dérivée du schéma zod — le
+  même schéma valide ensuite la réponse. Si l'appel échoue ou répond hors
+  schéma, le repas est enregistré quand même. Gemini lit le **HEIC** : les
+  photos iPhone passent sans conversion.
 - **Formulaire de sport manuel** : liste déroulante de types d'activité (la
   colonne reste du texte libre en base, donc rien n'empêche d'en ajouter).
 - **Verrou d'accès** : mot de passe unique via middleware Next.js, plus rapide

@@ -3,8 +3,8 @@ import { aujourdhui, instantParis } from "./dates";
 import { BUCKET_MEDICAMENTS, BUCKET_REPAS, cheminPhoto, supabase } from "./supabase";
 
 export const TAILLE_MAX_PHOTO = 10 * 1024 * 1024; // 10 Mo
-/** Au-delà, l'image dépasse la limite de l'API vision une fois encodée en base64. */
-export const TAILLE_MAX_VISION = 3.5 * 1024 * 1024;
+/** Au-delà, l'image encodée en base64 fait déborder la requête envoyée au modèle. */
+export const TAILLE_MAX_VISION = 7 * 1024 * 1024;
 
 export type PhotoRecue = {
   octets: Buffer;
