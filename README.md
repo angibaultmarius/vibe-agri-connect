@@ -51,7 +51,7 @@ npm run dev
 | `APP_SESSION_SECRET` | Secret de signature du cookie (`openssl rand -hex 32`) |
 | `INGEST_TOKEN` | Jeton partagé des routes `/api/ingest/*` |
 | `GEMINI_API_KEY` | Clé du modèle de vision (estimation des repas) |
-| `GEMINI_MODEL` | Facultatif — modèle de vision, défaut `gemini-2.5-flash` |
+| `GEMINI_MODEL` | Facultatif — modèle de vision, défaut `gemini-3.8-flash` |
 
 La clé Gemini se crée en deux clics sur
 [Google AI Studio](https://aistudio.google.com/apikey) — un compte Google
@@ -133,7 +133,8 @@ coquille de l'app.
 
 ## Décisions prises en construisant
 
-- **Modèle de vision** : API Gemini (`gemini-2.5-flash` par défaut), un seul
+- **Modèle de vision** : API Gemini (`gemini-3.8-flash` par défaut, épinglé —
+  un alias `-latest` changerait de comportement sans prévenir), un seul
   appel avec la photo et une sortie JSON structurée dérivée du schéma zod — le
   même schéma valide ensuite la réponse. Si l'appel échoue ou répond hors
   schéma, le repas est enregistré quand même. Gemini lit le **HEIC** : les

@@ -83,8 +83,11 @@ Estime la portion réellement visible sur l'image, pas une portion standard.
 Donne toujours une valeur numérique, même approximative — l'app préfère une
 estimation basse en confiance à une absence de donnée.`;
 
-/** Modèle par défaut, surchargeable sans toucher au code. */
-const MODELE = optionalEnv("GEMINI_MODEL") ?? "gemini-2.5-flash";
+/**
+ * Modèle épinglé : un alias `-latest` changerait de comportement sans prévenir.
+ * `GEMINI_MODEL` reste la porte de sortie pour en changer sans toucher au code.
+ */
+const MODELE = optionalEnv("GEMINI_MODEL") ?? "gemini-3.8-flash";
 
 /**
  * Un appel de vision, une réponse JSON structurée. Renvoie `null` si l'appel
