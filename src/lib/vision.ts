@@ -84,10 +84,19 @@ Donne toujours une valeur numérique, même approximative — l'app préfère un
 estimation basse en confiance à une absence de donnée.`;
 
 /**
- * Modèle épinglé : un alias `-latest` changerait de comportement sans prévenir.
- * `GEMINI_MODEL` reste la porte de sortie pour en changer sans toucher au code.
+ * Modèles épinglés : un alias `-latest` changerait de comportement sans
+ * prévenir. `GEMINI_MODEL` reste la porte de sortie pour en changer sans
+ * toucher au code.
+ *
+ * Le second sert de secours. Mesuré sur ce cas d'usage, les modèles flash
+ * renvoient régulièrement un 503 « high demand » sur une requête avec image,
+ * parfois tous en même temps ; or un repas photographié perd définitivement ses
+ * macros si l'appel échoue — on ne peut pas rejouer l'estimation plus tard.
+ * D'où trois tentatives : les deux modèles, puis le principal après une pause,
+ * le temps que le pic passe.
  */
-const MODELE = optionalEnv("GEMINI_MODEL") ?? "gemini-3.8-flash";
+const MODELE = optionalEnv("GEMINI_MODEL") ?? "gemini-3.6-flash";
+const MODELE_SECOURS = "gemini-3.8-flash";
 
 /**
  * Un appel de vision, une réponse JSON structurée. Renvoie `null` si l'appel
@@ -101,28 +110,41 @@ export async function estimerRepas(
   const apiKey = optionalEnv("GEMINI_API_KEY");
   if (!apiKey) return null;
 
-  try {
-    const ia = new GoogleGenAI({ apiKey });
-    const reponse = await ia.models.generateContent({
-      model: MODELE,
-      contents: [
-        createPartFromBase64(imageBase64, mediaType),
-        createPartFromText("Estime ce repas."),
-      ],
-      config: {
-        systemInstruction: CONSIGNE,
-        responseMimeType: "application/json",
-        responseSchema: SCHEMA_GEMINI,
-      },
-    });
+  const ia = new GoogleGenAI({ apiKey });
+  const aEssayer =
+    MODELE === MODELE_SECOURS
+      ? [MODELE, MODELE]
+      : [MODELE, MODELE_SECOURS, MODELE];
 
-    const texte = reponse.text;
-    if (!texte) return null;
+  for (const [rang, modele] of aEssayer.entries()) {
+    // Dernière tentative : on laisse au pic de charge le temps de retomber.
+    if (rang === aEssayer.length - 1) {
+      await new Promise((suite) => setTimeout(suite, 1500));
+    }
+    try {
+      const reponse = await ia.models.generateContent({
+        model: modele,
+        contents: [
+          createPartFromBase64(imageBase64, mediaType),
+          createPartFromText("Estime ce repas."),
+        ],
+        config: {
+          systemInstruction: CONSIGNE,
+          responseMimeType: "application/json",
+          responseSchema: SCHEMA_GEMINI,
+        },
+      });
 
-    const analyse = EstimationRepas.safeParse(JSON.parse(texte));
-    return analyse.success ? analyse.data : null;
-  } catch (error) {
-    console.error("Estimation IA du repas impossible :", error);
-    return null;
+      const texte = reponse.text;
+      if (!texte) continue;
+
+      const analyse = EstimationRepas.safeParse(JSON.parse(texte));
+      if (analyse.success) return analyse.data;
+      console.error(`Réponse hors schéma de ${modele} :`, texte);
+    } catch (error) {
+      console.error(`Estimation IA impossible avec ${modele} :`, error);
+    }
   }
+
+  return null;
 }

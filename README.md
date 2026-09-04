@@ -51,7 +51,7 @@ npm run dev
 | `APP_SESSION_SECRET` | Secret de signature du cookie (`openssl rand -hex 32`) |
 | `INGEST_TOKEN` | Jeton partagé des routes `/api/ingest/*` |
 | `GEMINI_API_KEY` | Clé du modèle de vision (estimation des repas) |
-| `GEMINI_MODEL` | Facultatif — modèle de vision, défaut `gemini-3.8-flash` |
+| `GEMINI_MODEL` | Facultatif — modèle de vision, défaut `gemini-3.6-flash` |
 
 La clé Gemini se crée en deux clics sur
 [Google AI Studio](https://aistudio.google.com/apikey) — un compte Google
@@ -133,12 +133,18 @@ coquille de l'app.
 
 ## Décisions prises en construisant
 
-- **Modèle de vision** : API Gemini (`gemini-3.8-flash` par défaut, épinglé —
-  un alias `-latest` changerait de comportement sans prévenir), un seul
-  appel avec la photo et une sortie JSON structurée dérivée du schéma zod — le
-  même schéma valide ensuite la réponse. Si l'appel échoue ou répond hors
-  schéma, le repas est enregistré quand même. Gemini lit le **HEIC** : les
-  photos iPhone passent sans conversion.
+- **Modèle de vision** : API Gemini, `gemini-3.6-flash` par défaut. Modèle
+  épinglé, jamais un alias `-latest` qui changerait de comportement sans
+  prévenir. La photo part avec une sortie JSON structurée, que le schéma zod
+  revalide avant écriture. Gemini lit le **HEIC** : les photos iPhone passent
+  sans conversion.
+- **Trois tentatives d'estimation** (`gemini-3.6-flash`, puis
+  `gemini-3.8-flash`, puis le principal après 1,5 s). Mesuré : les modèles
+  flash renvoient régulièrement un 503 « high demand » sur une requête avec
+  image, parfois tous en même temps. Un repas dont l'estimation échoue perd
+  définitivement ses macros — on ne peut pas rejouer l'appel plus tard — d'où
+  l'insistance. Si les trois échouent, le repas est enregistré quand même,
+  avec sa photo et des colonnes `ia_*` vides.
 - **Formulaire de sport manuel** : liste déroulante de types d'activité (la
   colonne reste du texte libre en base, donc rien n'empêche d'en ajouter).
 - **Verrou d'accès** : mot de passe unique via middleware Next.js, plus rapide
