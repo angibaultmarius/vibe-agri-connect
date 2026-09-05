@@ -47,8 +47,6 @@ npm run dev
 |---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL du projet Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clé service_role — **serveur uniquement** |
-| `APP_PASSWORD` | Mot de passe unique du verrou d'accès |
-| `APP_SESSION_SECRET` | Secret de signature du cookie (`openssl rand -hex 32`) |
 | `INGEST_TOKEN` | Jeton partagé des routes `/api/ingest/*` |
 | `GEMINI_API_KEY` | Clé du modèle de vision (estimation des repas) |
 | `GEMINI_MODEL` | Facultatif — modèle de vision, défaut `gemini-3.6-flash` |
@@ -62,19 +60,25 @@ photo, les colonnes `ia_*` restent vides.
 
 ## Sécurité
 
-Deux verrous distincts, parce que les appelants ne sont pas les mêmes :
+**L'interface est ouverte : aucun mot de passe.** C'est un choix assumé de
+l'auteur du projet, pris en connaissance de cause. Quiconque atteint l'URL de
+déploiement lit les photos de repas et de médicaments, le sommeil, la
+fréquence cardiaque et les pointages tabac — et peut écrire de nouvelles
+entrées via les routes appelées par l'app. Un `robots.txt` bloque au moins
+l'indexation par les moteurs de recherche, mais ce n'est pas une protection.
 
-1. **L'interface** est derrière un mot de passe unique (`src/middleware.ts`).
-   Le cookie de session est un jeton signé HMAC-SHA256, vérifié à chaque
-   requête. Sans `APP_SESSION_SECRET`, le middleware refuse tout plutôt que
-   d'ouvrir l'app.
-2. **Les routes d'ingestion** (`/api/ingest/*`), appelées par les Raccourcis
-   iOS, vérifient `Authorization: Bearer <INGEST_TOKEN>` — comparaison à temps
-   constant.
+Pour refermer l'app, il faut restaurer le middleware supprimé dans le commit
+« Retire le verrou d'accès de l'interface ».
 
-RLS est actif sur toutes les tables sans aucune policy : la clé anon ne lit
-rien. Tout passe par la clé service_role, côté serveur uniquement. Les buckets
-photo sont privés et servis par URL signées d'une heure.
+Ce qui reste protégé :
+
+- **Les routes d'ingestion** (`/api/ingest/*`), appelées par les Raccourcis
+  iOS, vérifient `Authorization: Bearer <INGEST_TOKEN>` — comparaison à temps
+  constant.
+- **La base.** RLS est actif sur toutes les tables sans aucune policy : la clé
+  publishable ne lit rien. Tout passe par la clé privilégiée, côté serveur
+  uniquement, jamais exposée au navigateur.
+- **Les photos.** Les buckets sont privés, servis par URL signées d'une heure.
 
 ## Déploiement
 

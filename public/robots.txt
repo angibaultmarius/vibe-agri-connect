@@ -1,0 +1,4 @@
+# L'app est ouverte sans mot de passe, mais rien ne justifie qu'un moteur de
+# recherche indexe des données de santé personnelles.
+User-agent: *
+Disallow: /
