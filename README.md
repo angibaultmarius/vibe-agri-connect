@@ -76,6 +76,23 @@ RLS est actif sur toutes les tables sans aucune policy : la clé anon ne lit
 rien. Tout passe par la clé service_role, côté serveur uniquement. Les buckets
 photo sont privés et servis par URL signées d'une heure.
 
+## Déploiement
+
+L'app tourne sur Vercel à **https://dailymprove.vercel.app**, reliée à la
+branche `main` : chaque push y déclenche un déploiement.
+
+Deux pièges, tous deux rencontrés en production :
+
+- **Les variables doivent exister avant le build.** Vercel les fige au moment
+  où il construit. Une variable ajoutée après coup n'atteint pas le
+  déploiement en cours — il faut redéployer pour qu'elle soit prise en compte.
+- **Redéployer sans le cache de build.** `NEXT_PUBLIC_SUPABASE_URL` est
+  inscrite en dur dans le bundle à la compilation ; avec le cache, elle peut
+  rester à son ancienne valeur.
+
+Une variable manquante ne passe pas inaperçue : `requireEnv` lève une erreur
+qui la nomme, visible dans les logs d'exécution Vercel.
+
 ## Base de données
 
 Le schéma est dans `supabase/migrations/0001_carnet_de_bord.sql` (tables,
