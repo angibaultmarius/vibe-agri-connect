@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { requireEnv } from "./env";
+import { optionalEnv, requireEnv } from "./env";
 
 /**
  * Client Supabase **serveur uniquement**.
@@ -11,10 +11,30 @@ import { requireEnv } from "./env";
  */
 let client: SupabaseClient | null = null;
 
+/**
+ * L'URL du projet Supabase n'est pas un secret — elle est publique par
+ * conception, et déjà dans `.env.example`. Elle sert donc de repli, pour que
+ * l'app ne tombe pas si la variable n'atteint pas le déploiement.
+ *
+ * Elle est lue sans le préfixe `NEXT_PUBLIC_` en priorité : ce préfixe force
+ * Next à inscrire la valeur en dur au moment du build, ce qui ajoute un piège
+ * (variable posée après coup, cache de build) pour une valeur qu'aucun code
+ * client n'utilise ici.
+ */
+const URL_PAR_DEFAUT = "https://rlvlkpsnreozelqydxai.supabase.co";
+
+export function urlProjet(): string {
+  return (
+    optionalEnv("SUPABASE_URL") ??
+    optionalEnv("NEXT_PUBLIC_SUPABASE_URL") ??
+    URL_PAR_DEFAUT
+  );
+}
+
 export function supabase(): SupabaseClient {
   if (!client) {
     client = createClient(
-      requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+      urlProjet(),
       requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
       { auth: { persistSession: false, autoRefreshToken: false } },
     );

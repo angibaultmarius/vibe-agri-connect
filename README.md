@@ -45,7 +45,7 @@ npm run dev
 
 | Variable | Rôle |
 |---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | URL du projet Supabase |
+|  `SUPABASE_URL` | URL du projet Supabase |
 | `SUPABASE_SERVICE_ROLE_KEY` | Clé service_role — **serveur uniquement** |
 | `INGEST_TOKEN` | Jeton partagé des routes `/api/ingest/*` |
 | `GEMINI_API_KEY` | Clé du modèle de vision (estimation des repas) |
@@ -90,7 +90,7 @@ Deux pièges, tous deux rencontrés en production :
 - **Les variables doivent exister avant le build.** Vercel les fige au moment
   où il construit. Une variable ajoutée après coup n'atteint pas le
   déploiement en cours — il faut redéployer pour qu'elle soit prise en compte.
-- **Redéployer sans le cache de build.** `NEXT_PUBLIC_SUPABASE_URL` est
+- **Redéployer sans le cache de build.**  `SUPABASE_URL` est
   inscrite en dur dans le bundle à la compilation ; avec le cache, elle peut
   rester à son ancienne valeur.
 
