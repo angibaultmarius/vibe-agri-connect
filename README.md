@@ -153,6 +153,13 @@ curl -X POST http://localhost:3000/api/ingest/sport \
 Le mode sombre suit `prefers-color-scheme` partout, pas seulement sur la
 coquille de l'app.
 
+Une couche de mouvement s'ajoute par-dessus, sans toucher aux couleurs ni aux
+typographies du brief : entrées de listes échelonnées, feuille modale qui monte
+sur un fond flouté, courbes qui se tracent, barres qui poussent, calendrier qui
+éclot case par case, retour tactile sur chaque contrôle, en-tête et barre
+d'onglets en verre dépoli. Le tout s'annule sous
+`prefers-reduced-motion: reduce`.
+
 ## Décisions prises en construisant
 
 - **Modèle de vision** : API Gemini, `gemini-3.6-flash` par défaut. Modèle

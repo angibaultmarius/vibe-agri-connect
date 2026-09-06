@@ -87,6 +87,7 @@ export function Courbe({
         <polyline
           key={i}
           points={trait}
+          pathLength={1}
           fill="none"
           stroke={couleur}
           strokeWidth="2"
@@ -157,6 +158,7 @@ export function Barres({
               height={Math.max(h, valeur > 0 ? 2 : 0)}
               rx="3"
               fill={couleur}
+              style={{ animationDelay: `${index * 0.05}s` }}
             />
             <text
               x={x + largeurBarre / 2}
