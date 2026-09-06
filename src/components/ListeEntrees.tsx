@@ -1,5 +1,6 @@
 import { heureCourte } from "@/lib/dates";
 import type { EntreeJournal } from "@/lib/donnees";
+import { BoutonEstimer } from "./BoutonEstimer";
 
 const BADGE: Record<EntreeJournal["type"], string> = {
   repas: "badge-repas",
@@ -54,7 +55,9 @@ export function ListeEntrees({ entrees }: { entrees: EntreeJournal[] }) {
             </span>
           </span>
 
-          {entree.photoUrl ? (
+          {entree.macrosManquantes ? (
+            <BoutonEstimer id={entree.id} />
+          ) : entree.photoUrl ? (
             <span className={`badge ${BADGE[entree.type]}`}>
               {LIBELLE_TYPE[entree.type]}
             </span>

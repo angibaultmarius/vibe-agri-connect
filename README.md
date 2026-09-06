@@ -113,6 +113,7 @@ index, RLS, buckets). Il est idempotent : rejouable sur un projet déjà migré.
 | `/api/repas` | POST multipart | l'app | `photo`, `moment`, `date?`, `heure?` |
 | `/api/medicaments` | POST multipart | l'app | `photo`, `moment`, `date?`, `heure?` |
 | `/api/tabac` | POST | l'app | `{ date, statut }` (upsert sur `date`) |
+| `/api/repas/{id}/estimer` | POST | l'app | rejoue l'estimation d'un repas sans macros |
 
 Les routes `/api/ingest/*` acceptent des rejeux : FC et sommeil sont des upserts
 sur la date, et le sport déduplique sur `(date, heure_debut)`.
@@ -165,7 +166,8 @@ coquille de l'app.
   image, parfois tous en même temps. Un repas dont l'estimation échoue perd
   définitivement ses macros — on ne peut pas rejouer l'appel plus tard — d'où
   l'insistance. Si les trois échouent, le repas est enregistré quand même,
-  avec sa photo et des colonnes `ia_*` vides.
+  avec sa photo et des colonnes `ia_*` vides — et la ligne porte alors un
+  bouton **Estimer** qui rejoue l'appel depuis la photo conservée.
 - **Formulaire de sport manuel** : liste déroulante de types d'activité (la
   colonne reste du texte libre en base, donc rien n'empêche d'en ajouter).
 - **Verrou d'accès** : mot de passe unique via middleware Next.js, plus rapide

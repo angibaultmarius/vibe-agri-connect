@@ -691,3 +691,20 @@ label > span {
   color: var(--texte-2);
   font-family: var(--police-mono), ui-monospace, monospace;
 }
+
+/* Relance d'une estimation ratée, sur la ligne du repas concerné. */
+.bouton-estimer {
+  flex: none;
+  background: var(--repas-fond);
+  color: var(--repas);
+  border: none;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font-family: var(--police-mono), ui-monospace, monospace;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.bouton-estimer:disabled {
+  opacity: 0.55;
+}

@@ -29,6 +29,8 @@ export interface EntreeJournal {
   photoUrl?: string;
   statut?: StatutTabac;
   source: string | null;
+  /** Repas dont l'estimation IA a échoué : la photo est là, pas les macros. */
+  macrosManquantes?: boolean;
 }
 
 async function lignes<T>(
@@ -141,6 +143,7 @@ export async function entrees(
       detail: r.ia_calories != null ? `${Math.round(r.ia_calories)} kcal` : null,
       photoUrl: urlsRepas[r.photo_url],
       source: r.source,
+      macrosManquantes: r.ia_calories == null,
     })),
     ...lesMedicaments.map((m) => ({
       id: m.id,
