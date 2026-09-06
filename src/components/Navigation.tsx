@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconeAujourdhui, IconeJournal, IconeTendances } from "./Icones";
+import { IconeAccueil, IconeCarnet, IconeCourbe } from "./pictos";
 
 const ONGLETS = [
-  { href: "/", libelle: "Aujourd'hui", Icone: IconeAujourdhui },
-  { href: "/journal", libelle: "Journal", Icone: IconeJournal },
-  { href: "/tendances", libelle: "Tendances", Icone: IconeTendances },
+  { href: "/", libelle: "Aujourd'hui", Icone: IconeAccueil },
+  { href: "/journal", libelle: "Journal", Icone: IconeCarnet },
+  { href: "/tendances", libelle: "Tendances", Icone: IconeCourbe },
 ];
 
 export function Navigation() {

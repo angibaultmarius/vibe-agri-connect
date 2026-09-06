@@ -30,6 +30,7 @@ qu'un score futur n'exige pas de migration.
 - **Supabase** — Postgres + Storage (buckets privés)
 - **API Gemini** (vision) pour l'estimation des repas, appelée **côté serveur**
 - CSS écrit à la main (design system en variables), aucun framework UI
+- Pictogrammes SVG figés dans le dépôt, issus de banques libres (voir Crédits)
 - PWA : `manifest.json` + service worker minimal, pour l'ajout à l'écran
   d'accueil iOS
 
@@ -179,6 +180,29 @@ d'onglets en verre dépoli. Le tout s'annule sous
   colonne reste du texte libre en base, donc rien n'empêche d'en ajouter).
 - **Verrou d'accès** : mot de passe unique via middleware Next.js, plus rapide
   à mettre en place que Vercel Authentication et indépendant de l'hébergeur.
+
+## Design
+
+Relief doux sur fond crème, accent orange. Les éléments ne sont pas posés sur
+le fond : ils en sortent, bombés ou creusés par une double ombre — claire en
+haut à gauche, chaude en bas à droite. Les valeurs mesurées et les champs de
+saisie sont creusés, les cartes et les tuiles d'action bombées.
+
+Photo de repas et de médicament : l'app ouvre une **vraie vue caméra** plein
+écran — viseur, cadre de visée, déclencheur rond, bascule avant/arrière — puis
+un aperçu à valider ou à reprendre. Le sélecteur de fichier ne sert plus que
+de repli quand le navigateur refuse la caméra.
+
+Le mouvement (entrées en cascade, feuille qui monte, courbes qui se tracent,
+barres qui poussent) s'annule sous `prefers-reduced-motion: reduce`.
+
+## Crédits
+
+Pictogrammes récupérés sur des banques libres, puis figés en SVG inline dans
+`src/components/pictos/` — aucune dépendance ni requête réseau à l'exécution :
+
+- **Fluent Emoji** (Microsoft), licence MIT — pictogrammes en couleur
+- **Lucide**, licence ISC — pictogrammes au trait
 
 ## Reste à faire
 

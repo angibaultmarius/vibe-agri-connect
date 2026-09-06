@@ -105,7 +105,7 @@ export default async function PageTendances() {
           <h2>FC au repos</h2>
           <span className="horodatage">bpm</span>
         </div>
-        <Courbe points={pointsFc} couleur="var(--graph-bleu)" suffixe=" bpm" />
+        <Courbe points={pointsFc} couleur="var(--graph-orange)" suffixe=" bpm" />
       </section>
 
       <section className="carte">
@@ -117,7 +117,7 @@ export default async function PageTendances() {
           </div>
           <div>
             <span className="libelle-champ texte-secondaire">Score</span>
-            <Courbe points={pointsScore} hauteur={100} couleur="var(--graph-orange)" />
+            <Courbe points={pointsScore} hauteur={100} couleur="var(--graph-prune)" />
           </div>
         </div>
       </section>

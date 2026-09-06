@@ -13,26 +13,23 @@ import {
   TYPES_ACTIVITE,
 } from "@/lib/habitudes";
 import type { StatutTabac } from "@/lib/types";
+import { CapturePhoto } from "./CapturePhoto";
 import { Feuille } from "./Feuille";
 import {
-  IconeMedicament,
-  IconeRepas,
-  IconeSport,
-  IconeTabac,
-} from "./Icones";
+  PictoMedicament,
+  PictoRepas,
+  PictoSport,
+  PictoTabac,
+} from "./pictos";
 
 type Flux = "repas" | "sport" | "medicament" | "tabac" | null;
+type Photo = { blob: Blob; apercu: string };
 
 const TUILES = [
-  { flux: "repas", libelle: "Repas", Icone: IconeRepas, rond: "rond-repas" },
-  { flux: "sport", libelle: "Sport", Icone: IconeSport, rond: "rond-sport" },
-  {
-    flux: "medicament",
-    libelle: "Médicament",
-    Icone: IconeMedicament,
-    rond: "rond-medicament",
-  },
-  { flux: "tabac", libelle: "Pointer", Icone: IconeTabac, rond: "rond-tabac" },
+  { flux: "repas", libelle: "Repas", Picto: PictoRepas },
+  { flux: "sport", libelle: "Sport", Picto: PictoSport },
+  { flux: "medicament", libelle: "Médicament", Picto: PictoMedicament },
+  { flux: "tabac", libelle: "Pointer", Picto: PictoTabac },
 ] as const;
 
 const TITRES: Record<Exclude<Flux, null>, string> = {
@@ -48,28 +45,36 @@ export function ActionsRapides({
   statutTabac?: StatutTabac | null;
 }) {
   const [flux, setFlux] = useState<Flux>(null);
+  const [photo, setPhoto] = useState<Photo | null>(null);
   const [autreJour, setAutreJour] = useState(false);
   const [date, setDate] = useState(aujourdhui());
   const router = useRouter();
 
-  const fermer = () => setFlux(null);
-  const apresEnvoi = () => {
+  function fermer() {
+    if (photo) URL.revokeObjectURL(photo.apercu);
+    setPhoto(null);
+    setFlux(null);
+  }
+
+  function apresEnvoi() {
     fermer();
     router.refresh();
-  };
+  }
+
+  const fluxPhoto = flux === "repas" || flux === "medicament";
 
   return (
     <>
       <div className="actions-rapides">
-        {TUILES.map(({ flux: cible, libelle, Icone, rond }) => (
+        {TUILES.map(({ flux: cible, libelle, Picto }) => (
           <button
             key={cible}
             type="button"
             className="tuile-action"
             onClick={() => setFlux(cible)}
           >
-            <span className={`rond ${rond}`}>
-              <Icone />
+            <span className="rond">
+              <Picto />
             </span>
             {libelle}
           </button>
@@ -99,25 +104,36 @@ export function ActionsRapides({
         </label>
       ) : null}
 
-      {flux ? (
+      {/* Les flux photo commencent par la caméra, pas par un formulaire. */}
+      {fluxPhoto && !photo ? (
+        <CapturePhoto
+          titre={flux === "repas" ? "Photo du repas" : "Photo de la prise"}
+          onPhoto={(blob, apercu) => setPhoto({ blob, apercu })}
+          onAnnuler={fermer}
+        />
+      ) : null}
+
+      {flux && (!fluxPhoto || photo) ? (
         <Feuille titre={TITRES[flux]} onFermer={fermer}>
-          {flux === "repas" ? (
+          {flux === "repas" && photo ? (
             <FormulairePhoto
               url="/api/repas"
               date={date}
+              photo={photo}
               moments={MOMENTS_REPAS}
               libelles={LIBELLE_MOMENT_REPAS}
               aide="La photo est analysée pour estimer le plat et ses macros."
               onFini={apresEnvoi}
             />
           ) : null}
-          {flux === "medicament" ? (
+          {flux === "medicament" && photo ? (
             <FormulairePhoto
               url="/api/medicaments"
               date={date}
+              photo={photo}
               moments={MOMENTS_MEDICAMENT}
               libelles={LIBELLE_MOMENT_MEDICAMENT}
-              aide="Photo au moment de la prise : une preuve horodatée, rien d'autre."
+              aide="Preuve horodatée de la prise, aucun traitement automatique."
               onFini={apresEnvoi}
             />
           ) : null}
@@ -137,11 +153,12 @@ export function ActionsRapides({
   );
 }
 
-/* ---------- Repas & médicament : photo + moment ---------- */
+/* ---------- Repas & médicament : la photo est déjà prise, reste le moment ---------- */
 
 function FormulairePhoto<M extends string>({
   url,
   date,
+  photo,
   moments,
   libelles,
   aide,
@@ -149,6 +166,7 @@ function FormulairePhoto<M extends string>({
 }: {
   url: string;
   date: string;
+  photo: Photo;
   moments: readonly M[];
   libelles: Record<M, string>;
   aide: string;
@@ -160,7 +178,8 @@ function FormulairePhoto<M extends string>({
 
   async function envoyer(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const form = new FormData();
+    form.set("photo", photo.blob, "photo.jpg");
     form.set("moment", moment);
     form.set("date", date);
 
@@ -182,16 +201,8 @@ function FormulairePhoto<M extends string>({
 
   return (
     <form onSubmit={envoyer}>
-      <label>
-        <span>Photo</span>
-        <input
-          type="file"
-          name="photo"
-          accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
-          capture="environment"
-          required
-        />
-      </label>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img className="apercu-capture" src={photo.apercu} alt="Photo prise" />
 
       <label>
         <span>Moment</span>
@@ -265,7 +276,7 @@ function FormulaireSport({
   return (
     <form onSubmit={envoyer}>
       <label>
-        <span>Type d'activité</span>
+        <span>Type d&apos;activité</span>
         <select name="type_activite" defaultValue={TYPES_ACTIVITE[0]}>
           {TYPES_ACTIVITE.map((type) => (
             <option key={type} value={type}>
@@ -277,14 +288,7 @@ function FormulaireSport({
 
       <label>
         <span>Durée (minutes)</span>
-        <input
-          type="number"
-          name="duree_minutes"
-          inputMode="numeric"
-          min={1}
-          max={600}
-          required
-        />
+        <input type="number" name="duree_minutes" inputMode="numeric" min={1} max={600} required />
       </label>
 
       <label>
@@ -304,8 +308,8 @@ function FormulaireSport({
       </div>
 
       <p className="texte-secondaire">
-        Séance ajoutée à la main : elle est marquée comme déclarative, pas
-        comme mesurée par la montre.
+        Séance ajoutée à la main : elle est marquée comme déclarative, pas comme
+        mesurée par la montre.
       </p>
 
       <button type="submit" className="bouton-principal" disabled={enCours}>
@@ -365,8 +369,8 @@ function FormulaireTabac({
         </button>
       ))}
       <p className="texte-secondaire">
-        Un jour non pointé reste neutre : il ne compte ni comme réussite ni
-        comme échec.
+        Un jour non pointé reste neutre : il ne compte ni comme réussite ni comme
+        échec.
       </p>
       {erreur ? <p className="message-erreur">{erreur}</p> : null}
     </div>

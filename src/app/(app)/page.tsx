@@ -1,5 +1,5 @@
 import { ActionsRapides } from "@/components/ActionsRapides";
-import { IconeCoeur, IconeSommeil } from "@/components/Icones";
+import { PictoCoeur, PictoLune } from "@/components/pictos";
 import { ListeEntrees } from "@/components/ListeEntrees";
 import { aujourdhui, dateLongue, duree, heureCourte } from "@/lib/dates";
 import {
@@ -42,7 +42,7 @@ export default async function PageAujourdhui() {
         <div className="grille-capteurs">
           <div className="mesure">
             <span className="libelle-champ">
-              <IconeCoeur /> FC au repos
+              <PictoCoeur /> FC au repos
             </span>
             {capteurs.fc?.fc_repos != null ? (
               <span className="valeur">
@@ -55,7 +55,7 @@ export default async function PageAujourdhui() {
 
           <div className="mesure">
             <span className="libelle-champ">
-              <IconeSommeil /> Nuit
+              <PictoLune /> Nuit
             </span>
             {capteurs.sommeil?.duree_minutes != null ? (
               <span className="valeur">
