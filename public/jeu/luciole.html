@@ -1,0 +1,777 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Luciole de Minuit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Grandstander:wght@500;800&family=Figtree:wght@400;600;700&display=swap">
+<style>
+  /* Un seul univers visuel, volontairement nocturne. */
+  :root {
+    color-scheme: dark;
+    --ink: #0A1320;
+    --ink-2: #102030;
+    --moss: #1F4A38;
+    --glow: #F4E27A;
+    --mint: #9FE6C8;
+    --rose: #E0708A;
+    --paper: #ECE8D6;
+    --muted: #A3B0A6;
+    --line: rgba(244, 226, 122, 0.18);
+    --display: "Grandstander", "Trebuchet MS", system-ui, sans-serif;
+    --body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  html, body { height: 100%; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--body);
+    font-size: 15px;
+    overflow: hidden;
+  }
+  .stage { position: relative; height: 100%; overflow: hidden; user-select: none; -webkit-user-select: none; }
+  #game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  .stage.is-playing #game { cursor: none; }
+
+  .hud {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: 12px;
+    padding: 14px 16px; pointer-events: none;
+    transition: opacity .4s ease;
+  }
+  .stage.is-menu .hud, .stage.is-menu .tools { opacity: 0; pointer-events: none; }
+  .lbl {
+    display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  .hud b { font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+  .hud-score b { color: var(--mint); }
+  .hud-clock { text-align: center; }
+  .hud-clock b { color: var(--glow); }
+  .combo {
+    margin-left: 6px; font-family: var(--display); font-weight: 800; font-size: 15px;
+    color: var(--ink); background: var(--mint); border-radius: 999px; padding: 1px 8px; vertical-align: 4px;
+  }
+  .hud-right { display: grid; justify-items: end; gap: 8px; }
+  .lives { display: flex; gap: 6px; }
+  .lives span {
+    width: 11px; height: 11px; border-radius: 50%;
+    border: 1.5px solid rgba(244, 226, 122, .45);
+  }
+  .lives span.on { background: var(--glow); border-color: var(--glow); box-shadow: 0 0 10px rgba(244, 226, 122, .8); }
+  .energy { width: min(120px, 28vw); height: 6px; border-radius: 999px; background: rgba(236, 232, 214, .12); overflow: hidden; }
+  .energy i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #E9B949, var(--glow)); border-radius: inherit; transition: width .15s linear; }
+  .energy.low i { background: var(--rose); }
+
+  .tools {
+    position: absolute; right: 16px; bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    display: flex; gap: 8px; transition: opacity .4s ease;
+  }
+  .chip {
+    font: 600 12px/1 var(--body); letter-spacing: .04em;
+    color: var(--paper); background: rgba(10, 19, 32, .6);
+    border: 1px solid var(--line); border-radius: 999px; padding: 8px 12px; cursor: pointer;
+  }
+  .chip:hover { border-color: rgba(244, 226, 122, .5); }
+  :focus-visible { outline: 2px solid var(--glow); outline-offset: 3px; }
+
+  .toast {
+    position: absolute; left: 50%; top: 84px; transform: translate(-50%, -6px);
+    font: 500 15px/1.3 var(--display); color: var(--paper); text-align: center;
+    padding: 8px 16px; border-radius: 999px; background: rgba(10, 19, 32, .55);
+    border: 1px solid var(--line); opacity: 0; pointer-events: none;
+    transition: opacity .5s ease, transform .5s ease; max-width: calc(100% - 32px);
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  .overlay {
+    position: absolute; inset: 0; display: grid; place-items: center;
+    padding: 16px; background: radial-gradient(ellipse at center, rgba(10, 19, 32, .15), rgba(10, 19, 32, .7));
+  }
+  .card {
+    width: 100%; max-width: 31rem; max-height: 100%; overflow: auto;
+    display: grid; gap: 18px;
+    padding: 28px clamp(20px, 5vw, 36px);
+    background: rgba(12, 24, 36, .78);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    border: 1px solid var(--line); border-radius: 22px;
+  }
+  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; color: var(--mint); }
+  h1, h2 { margin: 0; font-family: var(--display); text-wrap: balance; }
+  h1 { font-weight: 800; font-size: clamp(2.7rem, 11vw, 4.2rem); line-height: .92; color: var(--glow); text-shadow: 0 0 28px rgba(244, 226, 122, .45); }
+  h1 small { display: block; font-size: .46em; font-weight: 500; color: var(--paper); text-shadow: none; margin-top: 6px; }
+  h2 { font-weight: 800; font-size: clamp(1.8rem, 7vw, 2.4rem); line-height: 1; color: var(--glow); }
+  .card p { margin: 0; line-height: 1.55; color: #CFD6CB; max-width: 60ch; }
+  .legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .legend li { display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 1.3; color: var(--paper); }
+  .legend em { font-style: normal; color: var(--muted); display: block; font-size: 12px; }
+  .ico { flex: none; width: 14px; height: 14px; border-radius: 50%; }
+  .ico.pollen { background: var(--mint); box-shadow: 0 0 10px var(--mint); }
+  .ico.gold { background: #FFC94A; box-shadow: 0 0 12px #FFC94A; width: 16px; height: 16px; }
+  .ico.eyes { width: 18px; height: 8px; border-radius: 0; background: radial-gradient(circle at 25% 50%, #FF6F7F 3px, transparent 3.5px), radial-gradient(circle at 75% 50%, #FF6F7F 3px, transparent 3.5px); }
+  .keys { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  kbd { font: 600 11px/1 var(--body); color: var(--paper); border: 1px solid rgba(236, 232, 214, .3); border-bottom-width: 2px; border-radius: 5px; padding: 2px 5px; }
+  .row { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 18px; }
+  .btn {
+    font: 800 17px/1 var(--display); color: var(--ink); background: var(--glow);
+    border: 0; border-radius: 999px; padding: 14px 24px; cursor: pointer;
+    box-shadow: 0 0 0 0 rgba(244, 226, 122, .5), 0 0 24px rgba(244, 226, 122, .35);
+    transition: transform .15s ease, box-shadow .2s ease;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 0 0 4px rgba(244, 226, 122, .18), 0 0 30px rgba(244, 226, 122, .5); }
+  .best { font-size: 13px; color: var(--muted); }
+  .best b { color: var(--paper); font-variant-numeric: tabular-nums; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .stats div { display: grid; gap: 4px; }
+  .stats b { font: 800 26px/1 var(--display); font-variant-numeric: tabular-nums; }
+  .stats div:first-child b { color: var(--mint); }
+  .record { color: var(--glow); font-weight: 700; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .toast, .hud, .tools, .btn { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stage is-menu" id="stage">
+  <canvas id="game" aria-label="Le jardin de nuit"></canvas>
+
+  <header class="hud" aria-live="off">
+    <div class="hud-score"><span class="lbl">Pollen</span><b id="score">0</b><span class="combo" id="combo" hidden>×2</span></div>
+    <div class="hud-clock"><span class="lbl">Heure</span><b id="clock">21:00</b></div>
+    <div class="hud-right">
+      <div class="lives" id="lives" aria-label="Vies"><span class="on"></span><span class="on"></span><span class="on"></span></div>
+      <div class="energy" id="energy" aria-label="Lumière"><i id="energyBar"></i></div>
+    </div>
+  </header>
+
+  <div class="toast" id="toast" role="status"></div>
+
+  <div class="tools">
+    <button class="chip" id="muteBtn" type="button">Son : oui</button>
+    <button class="chip" id="pauseBtn" type="button">Pause</button>
+  </div>
+
+  <section class="overlay" id="startScreen">
+    <div class="card">
+      <span class="eyebrow">21:00 → 06:00 · un jardin, une nuit</span>
+      <h1>Luciole<small>de Minuit</small></h1>
+      <p>Ta lumière faiblit à chaque seconde. Butine le pollen pour la raviver, esquive les chauves-souris et les araignées, et tiens jusqu'au lever du jour.</p>
+      <ul class="legend">
+        <li><span class="ico pollen"></span><span>Pollen<em>+ lumière, combos</em></span></li>
+        <li><span class="ico gold"></span><span>Fleur d'or<em>plein jour 5 s</em></span></li>
+        <li><span class="ico eyes"></span><span>Yeux rouges<em>danger, −1 vie</em></span></li>
+      </ul>
+      <div class="keys">Souris ou doigt : guider la luciole · <kbd>←</kbd><kbd>↑</kbd><kbd>→</kbd><kbd>↓</kbd> ou <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> · <kbd>P</kbd> pause</div>
+      <div class="row">
+        <button class="btn" id="startBtn" type="button">Allumer la lumière</button>
+        <span class="best">Record : <b id="bestStart">0</b></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="overlay" id="endScreen" hidden>
+    <div class="card">
+      <span class="eyebrow" id="endEyebrow">Fin de partie</span>
+      <h2 id="endTitle">Ta lumière s'est éteinte</h2>
+      <p id="endText"></p>
+      <div class="stats">
+        <div><span class="lbl">Pollen</span><b id="endScore">0</b></div>
+        <div><span class="lbl">Heure</span><b id="endHour">21:00</b></div>
+        <div><span class="lbl">Record</span><b id="endBest">0</b></div>
+      </div>
+      <span class="record" id="newRecord" hidden>Nouveau record</span>
+      <div class="row">
+        <button class="btn" id="againBtn" type="button">Rejouer</button>
+        <span class="best">ou <kbd>Entrée</kbd></span>
+      </div>
+    </div>
+  </section>
+
+  <section class="overlay" id="pauseScreen" hidden>
+    <div class="card">
+      <span class="eyebrow">Pause</span>
+      <h2>La luciole se repose</h2>
+      <p>Le jardin t'attend. Rien ne bouge tant que tu ne reprends pas.</p>
+      <div class="row"><button class="btn" id="resumeBtn" type="button">Reprendre</button><span class="best"><kbd>P</kbd> ou <kbd>Échap</kbd></span></div>
+    </div>
+  </section>
+</div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const TAU = Math.PI * 2;
+  const HOUR = 25, HOURS = 9, START_H = 21;
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const rand = (a, b) => a + Math.random() * (b - a);
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  const stage = $('stage'), cv = $('game'), ctx = cv.getContext('2d');
+  const dark = document.createElement('canvas'), dctx = dark.getContext('2d');
+  const scene = document.createElement('canvas'), sctx = scene.getContext('2d');
+
+  const MESSAGES = [
+    '21:00 · La nuit tombe sur le jardin',
+    '22:00 · Les araignées descendent de leurs fils',
+    '23:00 · Les chauves-souris ont faim',
+    '00:00 · Minuit. Tiens bon.',
+    '01:00 · La nuit s\'épaissit',
+    '02:00 · Le jardin est à eux',
+    '03:00 · L\'heure la plus sombre',
+    '04:00 · Plus que deux heures',
+    '05:00 · Le ciel pâlit à l\'est…'
+  ];
+
+  let W = 0, H = 0, DPR = 1, stars = [];
+  let state = 'menu', g = null, player = null;
+  const keys = { left: false, right: false, up: false, down: false };
+  const pointer = { x: 0, y: 0, active: false };
+
+  // ---------- Stockage (optionnel) ----------
+  function loadBest() { try { return parseInt(localStorage.getItem('luciole-best') || '0', 10) || 0; } catch (e) { return 0; } }
+  function saveBest(v) { try { localStorage.setItem('luciole-best', String(v)); } catch (e) {} }
+  let best = loadBest();
+  $('bestStart').textContent = best;
+
+  // ---------- Son ----------
+  let actx = null, muted = false;
+  function initAudio() {
+    if (!actx) { try { actx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { actx = null; } }
+    if (actx && actx.state === 'suspended') actx.resume();
+  }
+  function tone(f, d, type = 'sine', v = 0.07, slide = 0, delay = 0) {
+    if (!actx || muted) return;
+    const t0 = actx.currentTime + delay;
+    const o = actx.createOscillator(), gn = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(f, t0);
+    if (slide) o.frequency.exponentialRampToValueAtTime(Math.max(30, f + slide), t0 + d);
+    gn.gain.setValueAtTime(0.0001, t0);
+    gn.gain.exponentialRampToValueAtTime(v, t0 + 0.012);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
+    o.connect(gn).connect(actx.destination);
+    o.start(t0); o.stop(t0 + d + 0.03);
+  }
+  const sfx = {
+    collect: (c) => tone(520 * Math.pow(1.122, c - 1), 0.14, 'triangle', 0.06, 260),
+    gold: () => [660, 830, 990, 1320].forEach((f, i) => tone(f, 0.18, 'triangle', 0.05, 0, i * 0.07)),
+    hit: () => { tone(180, 0.35, 'sawtooth', 0.05, -120); tone(90, 0.3, 'square', 0.03, -40); },
+    over: () => [440, 370, 311, 247].forEach((f, i) => tone(f, 0.3, 'triangle', 0.05, -20, i * 0.16)),
+    win: () => [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.32, 'triangle', 0.05, 0, i * 0.11)),
+    hour: () => tone(880, 0.5, 'sine', 0.03, -10)
+  };
+
+  // ---------- Décor ----------
+  function buildScenery() {
+    scene.width = cv.width; scene.height = cv.height;
+    sctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    const bg = sctx.createLinearGradient(0, 0, 0, H);
+    bg.addColorStop(0, '#15263A'); bg.addColorStop(0.6, '#173328'); bg.addColorStop(1, '#1D4230');
+    sctx.fillStyle = bg; sctx.fillRect(0, 0, W, H);
+
+    // Tiges et fleurs à différentes hauteurs : la lumière les révèle.
+    const petals = ['#D98FB0', '#9FB7E6', '#F2D48A', '#E6A4C4', '#B8E0F0'];
+    const n = Math.max(10, Math.round(W / 34));
+    for (let i = 0; i < n; i++) {
+      const x = rand(0, W), h = rand(H * 0.12, H * 0.62), lean = rand(-40, 40);
+      const hx = x + lean, hy = H - h;
+      sctx.strokeStyle = '#2E6247'; sctx.lineWidth = 2.2;
+      sctx.beginPath(); sctx.moveTo(x, H); sctx.quadraticCurveTo(x + lean * 0.2, H - h * 0.5, hx, hy); sctx.stroke();
+      // feuille
+      sctx.fillStyle = '#2B5C43';
+      const ly = H - h * rand(0.25, 0.5), lx = x + lean * 0.1;
+      sctx.beginPath(); sctx.ellipse(lx + 9, ly, 11, 4, -0.5, 0, TAU); sctx.fill();
+      const r = rand(4, 8), col = petals[i % petals.length];
+      sctx.fillStyle = col;
+      for (let k = 0; k < 6; k++) {
+        const a = k / 6 * TAU;
+        sctx.beginPath(); sctx.arc(hx + Math.cos(a) * r, hy + Math.sin(a) * r, r * 0.75, 0, TAU); sctx.fill();
+      }
+      sctx.fillStyle = '#F4D46A'; sctx.beginPath(); sctx.arc(hx, hy, r * 0.6, 0, TAU); sctx.fill();
+    }
+    // Champignons
+    for (let i = 0; i < Math.round(W / 160); i++) {
+      const x = rand(10, W - 10), y = H - rand(4, 14), s = rand(6, 11);
+      sctx.fillStyle = '#E8DCC0'; sctx.fillRect(x - s * 0.25, y - s, s * 0.5, s);
+      sctx.fillStyle = '#C0506A'; sctx.beginPath(); sctx.arc(x, y - s, s, Math.PI, 0); sctx.fill();
+    }
+    // Herbe
+    sctx.strokeStyle = '#2F6B4B'; sctx.lineWidth = 2;
+    for (let x = 0; x < W; x += 5) {
+      const h = rand(10, 38), lean = rand(-8, 8);
+      sctx.beginPath(); sctx.moveTo(x, H); sctx.quadraticCurveTo(x + lean * 0.5, H - h * 0.5, x + lean, H - h); sctx.stroke();
+    }
+    // Étoiles (dessinées au-dessus de l'obscurité)
+    stars = [];
+    const ns = Math.round(W * H / 7000);
+    for (let i = 0; i < ns; i++) stars.push({ x: rand(0, W), y: rand(0, H * 0.55), r: rand(0.4, 1.4), ph: rand(0, TAU) });
+  }
+
+  function resize() {
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    W = cv.clientWidth; H = cv.clientHeight;
+    cv.width = dark.width = Math.round(W * DPR);
+    cv.height = dark.height = Math.round(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    buildScenery();
+    if (player) { player.x = clamp(player.x, 10, W - 10); player.y = clamp(player.y, 10, H - 10); }
+  }
+
+  // ---------- Partie ----------
+  function newGame() {
+    g = {
+      t: 0, energy: 100, R: 200, lives: 3, score: 0, combo: 1, lastCollect: -9,
+      inv: 0, shake: 0, boost: 0, hourShown: -1,
+      pollens: [], bats: [], spiders: [], golds: [], parts: [],
+      nextBat: 4, nextSpider: 3, nextGold: rand(14, 22)
+    };
+    player = { x: W / 2, y: H * 0.5, vx: 0, vy: 0, ang: 0 };
+    for (let i = 0; i < 8; i++) spawnPollen();
+  }
+
+  function spawnPollen() {
+    let x = 0, y = 0;
+    for (let i = 0; i < 12; i++) {
+      x = rand(30, W - 30); y = rand(70, H - 40);
+      if (!player || Math.hypot(x - player.x, y - player.y) > 150) break;
+    }
+    g.pollens.push({ x, y, vx: rand(-10, 10), vy: rand(-8, 8), ph: rand(0, TAU) });
+  }
+  function spawnBat(lvl) {
+    const fromLeft = Math.random() < 0.5;
+    g.bats.push({
+      x: fromLeft ? -40 : W + 40, baseY: rand(60, H - 110), y: 0,
+      vx: (fromLeft ? 1 : -1) * (85 + lvl * 16 + rand(0, 45)),
+      amp: rand(18, 60), f: rand(1.4, 3), ph: rand(0, TAU), r: 14
+    });
+  }
+  function spawnSpider(lvl) {
+    g.spiders.push({ x: rand(30, W - 30), y: -16, target: rand(90, H * 0.7), phase: 'down', wait: rand(0.8, 2), speed: 75 + lvl * 12, r: 11 });
+  }
+  function spawnGold() {
+    g.golds.push({ x: rand(40, W - 40), y: rand(90, H - 60), life: 8, ph: 0 });
+  }
+
+  function burst(x, y, color, n, speed = 120) {
+    for (let i = 0; i < n; i++) {
+      const a = rand(0, TAU), s = rand(speed * 0.3, speed);
+      g.parts.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life: rand(0.4, 0.9), max: 0.9, c: color, r: rand(1.2, 2.6) });
+    }
+  }
+
+  function toast(msg) {
+    const el = $('toast');
+    el.textContent = msg; el.classList.add('show');
+    clearTimeout(toast.t); toast.t = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  function clockText(t) {
+    const h = Math.min(HOURS, Math.floor(t / HOUR));
+    const m = h >= HOURS ? 0 : Math.floor((t % HOUR) / HOUR * 6) * 10;
+    return String((START_H + h) % 24).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+  }
+
+  function collect(p) {
+    if (state === 'play') {
+      g.combo = g.t - g.lastCollect < 2.2 ? Math.min(5, g.combo + 1) : 1;
+      g.lastCollect = g.t;
+      g.score += 10 * g.combo;
+      g.energy = Math.min(100, g.energy + 14);
+      sfx.collect(g.combo);
+    }
+    burst(p.x, p.y, '#9FE6C8', 12);
+  }
+
+  function hit(x, y) {
+    g.lives--; g.inv = 1.8; g.shake = 0.35; g.combo = 1;
+    g.energy = Math.max(0, g.energy - 8);
+    burst(x, y, '#E0708A', 18, 160);
+    sfx.hit();
+    if (g.lives <= 0) endGame('caught');
+  }
+
+  function update(dt, time) {
+    const playing = state === 'play';
+    if (playing) g.t += dt;
+    const lvl = playing ? Math.min(8, g.t / HOUR) : 0;
+
+    // Déplacement
+    const px = player.x, py = player.y;
+    if (state === 'menu') {
+      player.x = W / 2 + Math.cos(time * 0.55) * W * 0.3;
+      player.y = H * 0.48 + Math.sin(time * 1.1) * H * 0.2;
+    } else if (playing) {
+      const dx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+      const dy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+      if (dx || dy) {
+        pointer.active = false;
+        const n = Math.hypot(dx, dy), k = Math.min(1, dt * 10);
+        player.vx += (dx / n * 330 - player.vx) * k;
+        player.vy += (dy / n * 330 - player.vy) * k;
+        player.x += player.vx * dt; player.y += player.vy * dt;
+      } else if (pointer.active) {
+        const k = Math.min(1, dt * 7);
+        let mx = (pointer.x - player.x) * k, my = (pointer.y - player.y) * k;
+        const m = Math.hypot(mx, my), max = 480 * dt;
+        if (m > max) { mx *= max / m; my *= max / m; }
+        player.x += mx; player.y += my;
+      } else {
+        const f = Math.pow(0.02, dt);
+        player.vx *= f; player.vy *= f;
+        player.x += player.vx * dt; player.y += player.vy * dt;
+      }
+      player.x = clamp(player.x, 8, W - 8);
+      player.y = clamp(player.y, 8, H - 8);
+    }
+    if (state === 'menu' || playing) {
+      const mvx = player.x - px, mvy = player.y - py;
+      if (Math.hypot(mvx, mvy) > 0.3) player.ang = Math.atan2(mvy, mvx);
+      // traînée
+      if (Math.random() < 0.8) g.parts.push({ x: player.x + rand(-3, 3), y: player.y + rand(-3, 3), vx: rand(-12, 12), vy: rand(-18, 4), life: 0.6, max: 0.6, c: '#F4E27A', r: rand(1, 2) });
+    }
+
+    // Lumière
+    if (playing) {
+      if (g.boost > 0) g.boost -= dt;
+      else g.energy -= (4.4 + lvl * 0.85) * dt;
+      g.inv -= dt; g.shake -= dt;
+      if (g.energy <= 0) { g.energy = 0; endGame('dark'); }
+      const h = Math.floor(g.t / HOUR);
+      if (h >= HOURS) endGame('dawn');
+      else if (h !== g.hourShown) { g.hourShown = h; toast(MESSAGES[h]); if (h > 0) sfx.hour(); }
+    }
+    const targetR = g.boost > 0 ? Math.max(W, H) * 0.95 : 44 + g.energy * 1.9;
+    g.R += (targetR - g.R) * Math.min(1, dt * (g.boost > 0 ? 3 : 6));
+
+    // Apparitions
+    if (playing) {
+      if ((g.nextBat -= dt) <= 0) { spawnBat(lvl); g.nextBat = Math.max(1.0, 4.6 - lvl * 0.45) * rand(0.6, 1.3); }
+      if (lvl >= 1 && (g.nextSpider -= dt) <= 0) { spawnSpider(lvl); g.nextSpider = Math.max(1.4, 5.5 - lvl * 0.5) * rand(0.6, 1.3); }
+      if ((g.nextGold -= dt) <= 0) { spawnGold(); g.nextGold = rand(18, 28); }
+    }
+
+    // Pollen
+    for (let i = g.pollens.length - 1; i >= 0; i--) {
+      const p = g.pollens[i];
+      p.x += p.vx * dt; p.y += (p.vy + Math.sin(time * 1.3 + p.ph) * 10) * dt;
+      if (p.x < 20 || p.x > W - 20) p.vx *= -1;
+      if (p.y < 60 || p.y > H - 30) p.vy *= -1;
+      p.x = clamp(p.x, 20, W - 20); p.y = clamp(p.y, 60, H - 30);
+      if ((state === 'menu' || playing) && Math.hypot(p.x - player.x, p.y - player.y) < 18) {
+        collect(p); g.pollens.splice(i, 1); spawnPollen();
+      }
+    }
+    // Fleurs d'or
+    for (let i = g.golds.length - 1; i >= 0; i--) {
+      const o = g.golds[i];
+      o.life -= dt; o.ph += dt;
+      if (o.life <= 0) { g.golds.splice(i, 1); continue; }
+      if (playing && Math.hypot(o.x - player.x, o.y - player.y) < 22) {
+        g.boost = 5; g.energy = 100; g.score += 50;
+        burst(o.x, o.y, '#FFC94A', 28, 180); sfx.gold(); toast('Fleur d\'or · plein jour pendant 5 s');
+        g.golds.splice(i, 1);
+      }
+    }
+    // Chauves-souris
+    for (let i = g.bats.length - 1; i >= 0; i--) {
+      const b = g.bats[i];
+      if (playing) b.x += b.vx * dt;
+      b.y = b.baseY + Math.sin(time * b.f + b.ph) * b.amp;
+      if (b.x < -80 || b.x > W + 80) { g.bats.splice(i, 1); continue; }
+      if (playing && g.inv <= 0 && Math.hypot(b.x - player.x, b.y - player.y) < b.r + 6) hit(b.x, b.y);
+    }
+    // Araignées
+    for (let i = g.spiders.length - 1; i >= 0; i--) {
+      const s = g.spiders[i];
+      if (playing) {
+        if (s.phase === 'down') { s.y += s.speed * dt; if (s.y >= s.target) s.phase = 'wait'; }
+        else if (s.phase === 'wait') { s.wait -= dt; if (s.wait <= 0) s.phase = 'up'; }
+        else { s.y -= s.speed * 1.2 * dt; if (s.y < -30) { g.spiders.splice(i, 1); continue; } }
+      }
+      if (playing && g.inv <= 0 && Math.hypot(s.x - player.x, s.y - player.y) < s.r + 6) hit(s.x, s.y);
+    }
+    // Particules
+    for (let i = g.parts.length - 1; i >= 0; i--) {
+      const p = g.parts[i];
+      p.life -= dt;
+      if (p.life <= 0) { g.parts.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.96; p.vy *= 0.96;
+    }
+  }
+
+  // ---------- Rendu ----------
+  function hole(x, y, r, a) {
+    const gr = dctx.createRadialGradient(x, y, 0, x, y, r);
+    gr.addColorStop(0, `rgba(0,0,0,${a})`);
+    gr.addColorStop(0.5, `rgba(0,0,0,${a * 0.85})`);
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    dctx.fillStyle = gr;
+    dctx.beginPath(); dctx.arc(x, y, r, 0, TAU); dctx.fill();
+  }
+
+  function drawBat(b, time) {
+    const flap = Math.sin(time * 16 + b.ph);
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.scale(b.vx > 0 ? 1 : -1, 1);
+    ctx.fillStyle = '#4B2B42';
+    for (const side of [-1, 1]) {
+      ctx.beginPath();
+      ctx.moveTo(0, -2);
+      ctx.quadraticCurveTo(side * 12, -10 - flap * 10, side * 24, -4 - flap * 12);
+      ctx.quadraticCurveTo(side * 20, 2, side * 16, 1);
+      ctx.quadraticCurveTo(side * 12, 6, side * 8, 2);
+      ctx.quadraticCurveTo(side * 4, 6, 0, 4);
+      ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = '#2D1826';
+    ctx.beginPath(); ctx.ellipse(0, 0, 6, 8, 0, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(-4, -6); ctx.lineTo(-3, -12); ctx.lineTo(-1, -7); ctx.moveTo(4, -6); ctx.lineTo(3, -12); ctx.lineTo(1, -7); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawSpider(s, time) {
+    ctx.strokeStyle = 'rgba(210,220,230,0.45)'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(s.x, 0); ctx.lineTo(s.x, s.y - 8); ctx.stroke();
+    ctx.strokeStyle = '#3A3F4C'; ctx.lineWidth = 1.6;
+    const wig = Math.sin(time * 10 + s.x) * 2;
+    for (let k = 0; k < 4; k++) {
+      const oy = -4 + k * 3;
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        ctx.moveTo(s.x, s.y + oy * 0.5);
+        ctx.lineTo(s.x + side * 9, s.y + oy - 5 + wig * side);
+        ctx.lineTo(s.x + side * 14, s.y + oy + 4);
+        ctx.stroke();
+      }
+    }
+    ctx.fillStyle = '#2A2E38';
+    ctx.beginPath(); ctx.arc(s.x, s.y - 6, 7, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(s.x, s.y + 3, 5.5, 0, TAU); ctx.fill();
+  }
+
+  function drawEyes(x, y, dx, alpha) {
+    ctx.fillStyle = `rgba(255,111,127,${alpha})`;
+    ctx.beginPath(); ctx.arc(x - dx, y, 1.8, 0, TAU); ctx.arc(x + dx, y, 1.8, 0, TAU); ctx.fill();
+  }
+
+  function drawFirefly(time) {
+    const { x, y, ang } = player;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const pulse = 0.85 + Math.sin(time * 6) * 0.15;
+    const gr = ctx.createRadialGradient(x, y, 0, x, y, 34);
+    gr.addColorStop(0, `rgba(255,243,166,${0.75 * pulse})`);
+    gr.addColorStop(0.4, `rgba(244,226,122,${0.28 * pulse})`);
+    gr.addColorStop(1, 'rgba(244,226,122,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, 34, 0, TAU); ctx.fill();
+    ctx.restore();
+
+    if (g.inv > 0 && Math.floor(g.inv * 12) % 2) return;
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(ang);
+    const flap = Math.sin(time * 40) * 0.5;
+    ctx.fillStyle = 'rgba(230,240,255,0.55)';
+    ctx.beginPath(); ctx.ellipse(1, -5, 6, 3, -0.5 - flap, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.ellipse(1, 5, 6, 3, 0.5 + flap, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#FFF6B8';
+    ctx.beginPath(); ctx.ellipse(-4, 0, 5, 3.4, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#3A3320';
+    ctx.beginPath(); ctx.ellipse(3, 0, 3.6, 2.8, 0, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
+  function draw(time) {
+    ctx.save();
+    if (g.shake > 0 && !reduceMotion) { const s = g.shake * 16; ctx.translate(rand(-s, s), rand(-s, s)); }
+    ctx.drawImage(scene, 0, 0, W, H);
+
+    // Sous l'obscurité
+    for (const s of g.spiders) drawSpider(s, time);
+    for (const b of g.bats) drawBat(b, time);
+    ctx.fillStyle = '#C8F5E2';
+    for (const p of g.pollens) { ctx.beginPath(); ctx.arc(p.x, p.y, 3.2, 0, TAU); ctx.fill(); }
+
+    // Obscurité
+    const dawn = state === 'menu' ? 0 : clamp((g.t / HOUR - 7.6) / 1.4, 0, 1);
+    const darkA = (state === 'menu' ? 0.9 : 0.955) - dawn * 0.62;
+    dctx.globalCompositeOperation = 'source-over';
+    dctx.clearRect(0, 0, W, H);
+    dctx.fillStyle = `rgba(4,8,14,${darkA})`;
+    dctx.fillRect(0, 0, W, H);
+    dctx.globalCompositeOperation = 'destination-out';
+    hole(player.x, player.y, g.R, 1);
+    for (const p of g.pollens) hole(p.x, p.y, 24, 0.75);
+    for (const o of g.golds) hole(o.x, o.y, 46, 0.9);
+    ctx.drawImage(dark, 0, 0, W, H);
+
+    // Au-dessus de l'obscurité
+    for (const s of stars) {
+      ctx.fillStyle = `rgba(236,232,214,${(0.35 + Math.sin(time * 1.7 + s.ph) * 0.3) * (1 - dawn * 0.8)})`;
+      ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.fill();
+    }
+    // Lune
+    const mx = W - Math.min(90, W * 0.14), my = 70;
+    ctx.fillStyle = `rgba(236,232,214,${0.8 - dawn * 0.5})`;
+    ctx.beginPath(); ctx.arc(mx, my, 18, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#0B1522';
+    ctx.globalAlpha = 1 - dawn;
+    ctx.beginPath(); ctx.arc(mx + 8, my - 5, 16, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const p of g.pollens) {
+      const a = 0.25 + Math.sin(time * 3 + p.ph) * 0.12;
+      const gr = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 14);
+      gr.addColorStop(0, `rgba(159,230,200,${a + 0.3})`); gr.addColorStop(1, 'rgba(159,230,200,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(p.x, p.y, 14, 0, TAU); ctx.fill();
+    }
+    for (const o of g.golds) {
+      const blink = o.life < 2 ? (Math.floor(o.life * 8) % 2 ? 0.35 : 1) : 1;
+      const r = 10 + Math.sin(o.ph * 4) * 2;
+      const gr = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, 30);
+      gr.addColorStop(0, `rgba(255,201,74,${0.9 * blink})`); gr.addColorStop(1, 'rgba(255,201,74,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(o.x, o.y, 30, 0, TAU); ctx.fill();
+      ctx.fillStyle = `rgba(255,220,120,${blink})`;
+      for (let k = 0; k < 5; k++) {
+        const a = k / 5 * TAU + o.ph;
+        ctx.beginPath(); ctx.arc(o.x + Math.cos(a) * r * 0.6, o.y + Math.sin(a) * r * 0.6, r * 0.45, 0, TAU); ctx.fill();
+      }
+    }
+    for (const p of g.parts) {
+      ctx.globalAlpha = Math.max(0, p.life / p.max);
+      ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.restore();
+
+    // Yeux qui brillent dans le noir
+    const glint = 0.75 + Math.sin(time * 5) * 0.2;
+    for (const b of g.bats) drawEyes(b.x + (b.vx > 0 ? 2 : -2), b.y - 2, 2.6, glint);
+    for (const s of g.spiders) drawEyes(s.x, s.y - 7, 2.4, glint);
+
+    drawFirefly(time);
+    ctx.restore();
+  }
+
+  // ---------- HUD ----------
+  const hud = { score: -1, clock: '', lives: -1, combo: -1, e: -1 };
+  function updateHud() {
+    if (g.score !== hud.score) { hud.score = g.score; $('score').textContent = g.score; }
+    const c = clockText(g.t);
+    if (c !== hud.clock) { hud.clock = c; $('clock').textContent = c; }
+    if (g.lives !== hud.lives) {
+      hud.lives = g.lives;
+      [...$('lives').children].forEach((el, i) => el.classList.toggle('on', i < g.lives));
+    }
+    const combo = state === 'play' && g.t - g.lastCollect < 2.2 ? g.combo : 1;
+    if (combo !== hud.combo) { hud.combo = combo; $('combo').hidden = combo < 2; $('combo').textContent = '×' + combo; }
+    const e = Math.round(g.energy);
+    if (e !== hud.e) { hud.e = e; $('energyBar').style.width = e + '%'; $('energy').classList.toggle('low', e < 25); }
+  }
+
+  // ---------- États ----------
+  function show(id) { ['startScreen', 'endScreen', 'pauseScreen'].forEach((s) => { $(s).hidden = s !== id; }); }
+  function setStage() {
+    stage.classList.toggle('is-menu', state === 'menu');
+    stage.classList.toggle('is-playing', state === 'play');
+  }
+
+  function startGame() {
+    initAudio();
+    newGame();
+    state = 'play';
+    pointer.active = false;
+    show(null); setStage();
+    $('pauseBtn').textContent = 'Pause';
+  }
+
+  function endGame(reason) {
+    if (state !== 'play') return;
+    state = 'over';
+    const texts = {
+      dawn: ['Victoire', 'L\'aube se lève', 'Le soleil pointe sur le jardin : tu as traversé la nuit entière. Bonus pour chaque vie et chaque lueur restante.'],
+      dark: ['Fin de partie', 'Ta lumière s\'est éteinte', 'Sans pollen, une luciole ne brille pas longtemps. Enchaîne les grains rapidement pour garder ton éclat.'],
+      caught: ['Fin de partie', 'Croquée en plein vol', 'Les yeux rouges trahissent les prédateurs dans le noir. Garde-les à l\'œil, même hors de ta lumière.']
+    }[reason];
+    if (reason === 'dawn') { g.score += g.lives * 150 + Math.round(g.energy) * 2; sfx.win(); } else sfx.over();
+    const record = g.score > best;
+    if (record) { best = g.score; saveBest(best); }
+    $('endEyebrow').textContent = texts[0];
+    $('endTitle').textContent = texts[1];
+    $('endText').textContent = texts[2];
+    $('endScore').textContent = g.score;
+    $('endHour').textContent = reason === 'dawn' ? '06:00' : clockText(g.t);
+    $('endBest').textContent = best;
+    $('bestStart').textContent = best;
+    $('newRecord').hidden = !record || g.score === 0;
+    updateHud();
+    setTimeout(() => { if (state === 'over') { show('endScreen'); setStage(); $('againBtn').focus(); } }, 700);
+  }
+
+  function togglePause() {
+    if (state === 'play') { state = 'pause'; show('pauseScreen'); $('pauseBtn').textContent = 'Reprendre'; $('resumeBtn').focus(); }
+    else if (state === 'pause') { state = 'play'; show(null); $('pauseBtn').textContent = 'Pause'; last = performance.now(); }
+    setStage();
+  }
+
+  // ---------- Entrées ----------
+  function setPointer(e) {
+    const r = cv.getBoundingClientRect();
+    pointer.x = e.clientX - r.left;
+    pointer.y = e.clientY - r.top - (e.pointerType === 'touch' ? 44 : 0);
+    pointer.active = true;
+  }
+  cv.addEventListener('pointermove', setPointer);
+  cv.addEventListener('pointerdown', (e) => { setPointer(e); initAudio(); });
+
+  const KEYMAP = { ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down' };
+  addEventListener('keydown', (e) => {
+    const k = KEYMAP[e.code];
+    if (k) { keys[k] = true; if (state === 'play') e.preventDefault(); return; }
+    if (e.code === 'KeyP' || e.code === 'Escape') { togglePause(); return; }
+    if ((e.code === 'Enter' || e.code === 'Space') && (state === 'menu' || state === 'over')) {
+      if (e.target.tagName !== 'BUTTON') { e.preventDefault(); startGame(); }
+    }
+  });
+  addEventListener('keyup', (e) => { const k = KEYMAP[e.code]; if (k) keys[k] = false; });
+  addEventListener('blur', () => { Object.keys(keys).forEach((k) => { keys[k] = false; }); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'play') togglePause(); });
+
+  $('startBtn').addEventListener('click', startGame);
+  $('againBtn').addEventListener('click', startGame);
+  $('resumeBtn').addEventListener('click', togglePause);
+  $('pauseBtn').addEventListener('click', togglePause);
+  $('muteBtn').addEventListener('click', () => {
+    muted = !muted;
+    $('muteBtn').textContent = muted ? 'Son : non' : 'Son : oui';
+    if (!muted) initAudio();
+  });
+
+  addEventListener('resize', resize);
+
+  // ---------- Boucle ----------
+  resize();
+  newGame();
+  let last = performance.now(), time = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    if (state !== 'pause') { time += dt; update(dt, time); }
+    draw(time);
+    if (state !== 'menu') updateHud();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
