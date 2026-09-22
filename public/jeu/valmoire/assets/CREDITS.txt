@@ -1,0 +1,16 @@
+Les Brumes de Valmoire : crédits des modèles 3D
+
+KayKit (Kay Lousberg, www.kaylousberg.com), licence CC0 1.0
+  - KayKit Character Pack : Adventurers 1.0 (Knight, Mage, Barbarian, Rogue_Hooded, animations)
+  - KayKit Character Pack : Skeletons 1.0 (Skeleton_Warrior, Minion, Rogue, Mage, armes)
+  - KayKit Dungeon Remastered 1.0 (murs, dalles, piliers, torches, coffres, bannières, pièges)
+  - KayKit Medieval Hexagon Pack 1.0 (maisons, forge, moulin, puits, taverne, église, arbres, rochers, accessoires)
+  Source : https://github.com/KayKit-Game-Assets
+
+Renard (Fox), glTF Sample Assets de Khronos
+  - Modèle : PixelMannen, CC0 1.0
+  - Rig et animations : tomkranis, CC BY 4.0
+  - Conversion glTF : AsoboStudio et scurest, CC BY 4.0
+  Source : https://github.com/KhronosGroup/glTF-Sample-Assets/tree/main/Models/Fox
+
+Les fichiers ont été allégés pour le mobile (animations partagées, géométrie quantifiée) avec glTF-Transform.
